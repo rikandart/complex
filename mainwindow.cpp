@@ -21,7 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
 #ifndef QT_DEBUG
     setPath(m_qfsm->myComputer().toString());
 #else
-    this->setPath("");
+    this->setPath("D:/cuza/CUZADATA/2009-SIRIUS/2014/04/15");
 #endif
 }
 
@@ -58,4 +58,12 @@ void MainWindow::on_pathTo_textChanged(const QString &arg1)
     if(arg1.length()&&(arg1.lastIndexOf('/') == arg1.length()-1 ||
        arg1.lastIndexOf('\\') == arg1.length()-1))
         setPath(arg1);
+}
+
+void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
+    if(m_qfsm->fileName(index).contains(".dat", Qt::CaseInsensitive)){
+        INIProcessor ini;
+        ini.read(m_qfsm->filePath(index).replace(".dat", ".ini", Qt::CaseInsensitive));
+    }
+
 }

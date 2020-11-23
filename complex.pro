@@ -17,11 +17,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
     fileExplorer.cpp \
+    iniprocessor.cpp \
     main.cpp \
     mainwindow.cpp
 
 HEADERS += \
     fileExplorer.h \
+    iniprocessor.h \
     mainwindow.h
 
 FORMS += \

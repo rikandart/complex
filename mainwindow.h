@@ -7,6 +7,7 @@
 #include <QSplitter>
 #include <QResizeEvent>
 #include "fileExplorer.h"
+#include "iniprocessor.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -22,6 +23,8 @@ public:
 
 private slots:
     void on_pathTo_textChanged(const QString &arg1);
+
+    void on_fileTree_doubleClicked(const QModelIndex &index);
 
 private:
     Ui::MainWindow *ui;
