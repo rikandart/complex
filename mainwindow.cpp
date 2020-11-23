@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QDebug>
+//#define WORK
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,7 +22,11 @@ MainWindow::MainWindow(QWidget *parent)
 #ifndef QT_DEBUG
     setPath(m_qfsm->myComputer().toString());
 #else
+#ifndef WORK
     this->setPath("D:/cuza/CUZADATA/2009-SIRIUS/2014/04/15");
+#else
+    this->setPath("E:/CUZADATA/2009-SIRIUS/2014/04/15");
+#endif
 #endif
 }
 
