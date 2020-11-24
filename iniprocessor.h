@@ -1,9 +1,15 @@
 #ifndef INIPROCESSOR_H
 #define INIPROCESSOR_H
 
+#include "cuza.h"
+
 #include <QObject>
 #include <QDebug>
 #include <QSettings>
+#include <QStringList>
+#include <QSet>
+#include <QFileInfo>
+#include "error.h"
 
 class INIProcessor : public QObject
 {
@@ -16,6 +22,10 @@ public:
 signals:
 
 private:
+    Cuza& cuza = Cuza::get();
+    bool validate(const QSettings& ini);
+    void error(const QString& msg);
+    void warning(const QString& msg);
 };
 
 #endif // INIPROCESSOR_H

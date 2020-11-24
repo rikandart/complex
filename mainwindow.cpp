@@ -1,7 +1,8 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QDebug>
-//#define WORK
+#include <QSysInfo>
+#include <QHostInfo>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -22,11 +23,10 @@ MainWindow::MainWindow(QWidget *parent)
 #ifndef QT_DEBUG
     setPath(m_qfsm->myComputer().toString());
 #else
-#ifndef WORK
-    this->setPath("D:/cuza/CUZADATA/2009-SIRIUS/2014/04/15");
-#else
-    this->setPath("E:/CUZADATA/2009-SIRIUS/2014/04/15");
-#endif
+    if(!QHostInfo::localHostName().compare("NIO-72-W11", Qt::CaseInsensitive))
+        this->setPath("E:/CUZADATA/2009-SIRIUS/2014/04/15");
+    else
+        this->setPath("D:/cuza/CUZADATA/2009-SIRIUS/2014/04/15");
 #endif
 }
 
