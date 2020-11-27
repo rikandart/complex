@@ -4,6 +4,7 @@
 #include <QPixmap>
 #include <QApplication>
 #include <QThread>
+#include <QString>
 
 int main(int argc, char *argv[])
 {

@@ -22,8 +22,53 @@ void INIProcessor::read(const QString& filename){
             cuza.setFreq(readFloat(ini.value("MAIN/freq")));
             cuza.setIfFreq(readFloat(ini.value("MAIN/Fpch")));
             cuza.setFd(readFloat(ini.value("MAIN/discrFreq")));
-            // 241120
-            cuza.s
+            cuza.setVersion(ini.value("MAIN/version").toInt());
+            if(cuza.getVersion() == 3)
+                cuza.setFreqInv((cuza.getFreq() < 562.5)
+                     || (cuza.getFreq() > 3932.5) ? -1 : 1);
+            else cuza.setFreqInv(ini.value("MAIN/freq_inv").toInt());
+            cuza.setMaxSamples(ini.value("MAIN/MAX_SAMPLES").toUInt());
+            cuza.setBuffLength(ini.value("MAIN/bufLength").toUInt());
+            cuza.setNFFT(ini.value("MAIN/NFFT").toUInt());
+            // Размер сэмпла в байтах (2)
+            cuza.setSampWidth(ini.value("MAIN/sample_width", 2).toUInt());
+            // Размер сэмпла в битах (12)
+            cuza.setSampBitWidth(ini.value("MAIN/sample_bit_width", 12).toUInt());
+            // Величина децимации (2)
+            cuza.setDecimationRatio(ini.value("MAIN/decimation_ratio", 2).toUInt());
+            cuza.setPorog(ini.value("MAIN/porog", 20).toDouble());
+            cuza.setPorogFFT(ini.value("MAIN/POROG_FFT", 0).toDouble());
+            cuza.setSyncStart(ini.value("TIME/Sync_StartL", 0).toInt() |
+                              ini.value("TIME/Sync_StartH", 0).toInt() << 32);
+            cuza.setTimeStart(ini.value("TIME/Timer_StartL", 0).toInt() |
+                              ini.value("TIME/Timer_StartH", 0).toInt() << 32);
+            cuza.setMaxVisSamples(ini.value("MAIN/MAX_VIS_SAMPLES", 65536).toUInt());
+            cuza.setMaxTimeSamples(ini.value("MAIN/MAX_TIME_SAMPLES", 65536).toInt());
+            cuza.setShowRF(ini.value("MAIN/showRF", 1).toBool());
+            cuza.setShowVideo(ini.value("MAIN/showVideo", 1).toBool());
+            cuza.setShowPhase(ini.value("MAIN/showPhase", 1).toBool());
+            cuza.setShowPIPOnly(ini.value("MAIN/showPhaseInPulseOnly", 0).toBool());
+            cuza.setShowFreq(ini.value("MAIN/showFreq", 1).toBool());
+            cuza.setShowFIPOnly(ini.value("MAIN/showFreqInPulseOnly", 0).toBool());
+            cuza.setShowSpectrum(ini.value("MAIN/showSpectrum", 0).toBool());
+            cuza.setSpectrumType(ini.value("MAIN/showSpectrumType", 0).toUInt());
+            cuza.setSpectrumWindow(ini.value("MAIN/showSpectrumWindow", 0).toUInt());
+            cuza.setSpectrumPoints(ini.value("MAIN/spectrumPoints", 1024).toUInt());
+            cuza.setShowCoarseFreq(ini.value("MAIN/showCoarseFreq", 1).toBool());
+            cuza.setShowCoarseVideo(ini.value("MAIN/showCoarseVideo", 1).toBool());
+            cuza.setLinCorr(ini.value("MAIN/linCorr", 0).toDouble());
+            cuza.setFFTScale(ini.value("MAIN/FFTScale", 0).toInt());
+            cuza.setPhiCorr(ini.value("MAIN/phicorr", 0).toDouble());
+            cuza.setSpecrogramPoints(ini.value("MAIN/spectrogramPoints", 32).toUInt());
+            cuza.setFreqShift(ini.value("MAIN/freqShift", 0).toDouble());
+            cuza.setHidePoints(ini.value("MAIN/HidePoints", 0).toUInt());
+            cuza.setFineMixer(ini.value("MAIN/FineMixer", 0).toBool());
+            cuza.setSoftLimiter(ini.value("MAIN/SoftLimiter", 1).toBool());
+            cuza.setSpectrogramPerekr(ini.value("MAIN/spectrogram_perekr", 1).toUInt());
+            cuza.setFreqSM(ini.value("MAIN/FREQ_SM", 1).toBool());
+            cuza.setFreqSMRatio(ini.value("MAIN/FREQ_SM_RATIO", 16).toUInt());
+            cuza.setCompMode(0);
+            cuza.setFreqOffset(0);
         }
     } else error(filename + " отсутсвует");
 }
