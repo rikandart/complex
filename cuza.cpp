@@ -4,6 +4,51 @@ Cuza Cuza::obj;
 
 Cuza::Cuza(QObject *parent) : QObject(parent){}
 
+Cuza::~Cuza()
+{
+    delete mainbuffer;
+}
+
+uchar *Cuza::getMainbuffer() const
+{
+    return mainbuffer;
+}
+
+void Cuza::appendToBuffer(uchar value)
+{
+    Q_ASSERT(next_i < buffLength);
+    mainbuffer[next_i] = value;
+    next_i++;
+}
+
+void Cuza::resizeBuffer(unsigned size)
+{
+    // удаляем старый буфер и создаем новый
+    if (mainbuffer){
+        delete mainbuffer;
+        next_i = 0;
+    }
+    mainbuffer = new uchar[size];
+    mainBufferSize = size;
+    qDebug() << "Main buffer size" << mainBufferSize;
+}
+
+size_t Cuza::getBufferSize() const
+{
+    return sizeof (mainbuffer);
+}
+
+Cuza::operator QString() const
+{
+   QString out = "";
+   for(int i  = 0; i < mainBufferSize; i++){
+       out += QString::number(mainbuffer[i]) + " ";
+       if(i !=0 && i % 8 == 0.0)
+           out += "\n";
+   }
+   return out;
+}
+
 bool Cuza::getCompMode() const
 {
     return compMode;

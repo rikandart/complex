@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QVector>
+#include <QDebug>
+#include <cmath>
 
 // типы
 // Тип выводимого на график спектра.
@@ -170,8 +172,17 @@ public:
     bool getCompMode() const;
     void setCompMode(bool value);
 
+    // перед добавлением элементов в буфер
+    // необходимо изменить его размер
+    uchar *getMainbuffer() const;
+    void appendToBuffer(uchar value);
+    void resizeBuffer(unsigned size);
+    size_t getBufferSize() const;
+
+    operator QString() const;
 private:
     explicit Cuza(QObject *parent = nullptr);
+    ~Cuza();
     static Cuza obj;                // объект синглтона
 
     float       freq = 0.0,         // полная входная частота в полосе 0.3-18 ГГц
@@ -198,7 +209,8 @@ private:
                 specrogramPoints = 0,// количество точек спектрограммы
                 hidePoints = 0,     // сколько скрывать точек перед выводом на график
                 spectrogramPerekr = 0,// количество точек перекрытия гистограммы
-                freqSMRatio = 0;    // коэффициент усреднения (2,4,6,8 ...)
+                freqSMRatio = 0,    // коэффициент усреднения (2,4,6,8 ...)
+                next_i = 0;         // индекс следующего элемента для записи в буфер
 
 
     double      porog = 0.0,        // порог для измерений
@@ -228,11 +240,14 @@ private:
                 freqSM = 0,         // усреднение частоты
                 compMode = 0;       // режим сравнения
 
+    size_t      mainBufferSize = 0;
     SpectrumTypes   spectrumType;   // тип выводимого спектра
     SpectrumWindows spectrumWindow; // тип оконной функции для расчета спектра
 
     QVector<unsigned> coeffs;
     QList<QVector<unsigned>> coefNums;
+
+    uchar*       mainbuffer;
 signals:
 
 };

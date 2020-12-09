@@ -18,21 +18,22 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
     cuza.cpp \
+    dataprocessor.cpp \
     error.cpp \
-    fileExplorer.cpp \
     iniprocessor.cpp \
+    jsonprocessor.cpp \
     main.cpp \
     mainwindow.cpp
 
 HEADERS += \
     cuza.h \
+    dataprocessor.h \
     error.h \
-    fileExplorer.h \
     iniprocessor.h \
+    jsonprocessor.h \
     mainwindow.h
 
 FORMS += \
-    fileExplorer.ui \
     mainwindow.ui
 
 TRANSLATIONS += \

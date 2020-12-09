@@ -6,7 +6,10 @@
 #include <QDir>
 #include <QSplitter>
 #include <QResizeEvent>
-#include "fileExplorer.h"
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QPointF>
+#include "dataprocessor.h"
 #include "iniprocessor.h"
 
 QT_BEGIN_NAMESPACE
@@ -29,8 +32,11 @@ private slots:
 private:
     Ui::MainWindow *ui;
     QFileSystemModel *m_qfsm;
+    QGraphicsView * m_graphView;
+    QGraphicsScene * m_graphScene;
     QSplitter* splitter;
     void setPath(const QString& path);
     virtual void resizeEvent(QResizeEvent* event) override;
+    void graphTabInit();
 };
 #endif // MAINWINDOW_H

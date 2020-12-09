@@ -17,7 +17,7 @@ class INIProcessor : public QObject
 public:
     explicit INIProcessor(QObject *parent = nullptr);
     ~INIProcessor();
-    void read(const QString& filename);
+    bool read(const QString& filename);
 
 signals:
 

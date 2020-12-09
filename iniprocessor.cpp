@@ -5,7 +5,7 @@ INIProcessor::INIProcessor(QObject *parent) : QObject(parent){}
 INIProcessor::~INIProcessor(){}
 
 // чтение ini файла
-void INIProcessor::read(const QString& filename){
+bool INIProcessor::read(const QString& filename){
     Q_ASSERT(filename.contains(".ini", Qt::CaseInsensitive));
     if(QFileInfo(filename).exists()){
         QSettings ini(filename, QSettings::IniFormat);
@@ -69,8 +69,10 @@ void INIProcessor::read(const QString& filename){
             cuza.setFreqSMRatio(ini.value("MAIN/FREQ_SM_RATIO", 16).toUInt());
             cuza.setCompMode(0);
             cuza.setFreqOffset(0);
+            return true;
         }
     } else error(filename + " отсутсвует");
+    return false;
 }
 
 // проверка ключей

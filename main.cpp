@@ -1,5 +1,5 @@
 #include "mainwindow.h"
-#include <fileExplorer.h>
+#include <dataprocessor.h>
 #include <QSplashScreen>
 #include <QPixmap>
 #include <QApplication>
@@ -18,5 +18,8 @@ int main(int argc, char *argv[])
     splash.show();
     QThread::sleep(5);
 #endif
+
+//        for(int i = 0; i< points.size(); i++)
+//            scene->addLine(0, 150, 150, 0);
     return a.exec();
 }
