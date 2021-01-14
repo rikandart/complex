@@ -35,7 +35,14 @@ void Cuza::resizeBuffer(unsigned size)
 
 size_t Cuza::getBufferSize() const
 {
-    return sizeof (mainbuffer);
+    return mainBufferSize;
+    // return sizeof (mainbuffer);
+}
+
+uchar Cuza::getBufValue(const unsigned i)
+{
+    Q_ASSERT(i < buffLength);
+    return mainbuffer[i];
 }
 
 Cuza::operator QString() const

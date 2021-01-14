@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QSysInfo>
 #include <QHostInfo>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -14,7 +15,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_qfsm->setNameFilterDisables(false);
     ui->fileTree->setModel(m_qfsm);
     ui->fileTree->setSortingEnabled(false);
+    m_dataPr = new DataProcessor;
     graphTabInit();
+    QTimer::singleShot(0, this, SLOT(appReady()));
     /*splitter = new QSplitter(this->centralWidget());
     splitter->setOrientation(Qt::Horizontal);
     // set position for splitter
@@ -50,14 +53,15 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 {
     static bool frst = true;
     if(frst){
-        qDebug() << this->height()-85;
+        // qDebug() << this->height()-85;
         m_graphView->resize(this->width()-24, this->height()-85);
         frst = false;
     } else{
-        QSize delta = event->size() - event->oldSize();
+        QSize delta = ui->tabWidget->size() - oldSize;
+        oldSize = ui->tabWidget->size();
         m_graphView->resize(m_graphView->size()+delta);
+        if(!m_graphScene->items().isEmpty()) m_dataPr->dispOutput();
     }
-
     /*ui->tabWidget->resize(ui->tabWidget->size() + delta);
     quint64 wCount = ui->tabWidget->count();
     for(double i = 0; i < wCount/2.0; i++){
@@ -72,12 +76,19 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 void MainWindow::graphTabInit()
 {
     ui->tab_2->setSizePolicy(ui->tabWidget->sizePolicy());
-    m_graphView = new QGraphicsView(ui->tab_2);
+    m_graphView = new GraphView(ui->tab_2);
     m_graphScene = new QGraphicsScene();
     m_graphView->setScene(m_graphScene);
-//    m_graphView->resize(ui->tabWidget->width()-10, ui->tabWidget->height()-50);
-    qDebug() << ui->tabWidget->size();
-    m_graphScene->addLine(0, 150, 150, 0);
+    m_graphView->setLineWidth(10);
+    QObject::connect(m_graphView, &GraphView::scaleChanged, m_dataPr, &DataProcessor::setScale);
+    // m_graphView->resize(ui->tabWidget->width()-10, ui->tabWidget->height()-50);
+    // qDebug() << ui->tabWidget->size();
+    // m_graphScene->addLine(0, 150, 150, 0);
+}
+
+void MainWindow::appReady()
+{
+    oldSize = ui->tabWidget->size();
 }
 
 
@@ -93,8 +104,8 @@ void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
         INIProcessor ini;
         if(ini.read(m_qfsm->filePath(index).
            replace(".dat", ".ini", Qt::CaseInsensitive))){
-            DataProcessor data_pr;
-            data_pr.Read(m_qfsm->filePath(index));
+            m_dataPr->Read(m_qfsm->filePath(index));
+            m_dataPr->dispOutput(m_graphScene);
         }
     }
 

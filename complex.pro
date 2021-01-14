@@ -20,6 +20,7 @@ SOURCES += \
     cuza.cpp \
     dataprocessor.cpp \
     error.cpp \
+    graphview.cpp \
     iniprocessor.cpp \
     jsonprocessor.cpp \
     main.cpp \
@@ -29,6 +30,7 @@ HEADERS += \
     cuza.h \
     dataprocessor.h \
     error.h \
+    graphview.h \
     iniprocessor.h \
     jsonprocessor.h \
     mainwindow.h

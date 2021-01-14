@@ -9,6 +9,7 @@
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QPointF>
+#include "graphview.h"
 #include "dataprocessor.h"
 #include "iniprocessor.h"
 
@@ -32,11 +33,16 @@ private slots:
 private:
     Ui::MainWindow *ui;
     QFileSystemModel *m_qfsm;
-    QGraphicsView * m_graphView;
+    GraphView * m_graphView;
     QGraphicsScene * m_graphScene;
     QSplitter* splitter;
+    DataProcessor* m_dataPr;
+    QSize oldSize;
     void setPath(const QString& path);
     virtual void resizeEvent(QResizeEvent* event) override;
     void graphTabInit();
+public slots:
+    // слот вызываемый по готовности приложения
+    void appReady();
 };
 #endif // MAINWINDOW_H

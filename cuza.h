@@ -178,6 +178,7 @@ public:
     void appendToBuffer(uchar value);
     void resizeBuffer(unsigned size);
     size_t getBufferSize() const;
+    uchar getBufValue(const unsigned i);
 
     operator QString() const;
 private:
