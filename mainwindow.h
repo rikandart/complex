@@ -7,6 +7,12 @@
 #include <QSplitter>
 #include <QResizeEvent>
 #include <QGraphicsView>
+#include <QtCharts/QChartView>
+#include <QtCharts/QChart>
+#include <QtCharts/QLineSeries>
+#include <QtCharts/QScatterSeries>
+#include <QtCharts/QLegendMarker>
+#include <QValueAxis>
 #include <QGraphicsScene>
 #include <QPointF>
 #include "graphview.h"
@@ -17,6 +23,7 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
+using namespace QtCharts;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -35,6 +42,9 @@ private:
     QFileSystemModel *m_qfsm;
     GraphView * m_graphView;
     QGraphicsScene * m_graphScene;
+    QChartView* m_chartView;
+    QChart* m_chart;
+    QLineSeries* m_series;
     QSplitter* splitter;
     DataProcessor* m_dataPr;
     QSize oldSize;

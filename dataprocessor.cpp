@@ -20,27 +20,30 @@ void DataProcessor::Read(const QString &filename)
         d_stream >> element;
         cuza.appendToBuffer(element);
     }
-    // qDebug() << cuza;
-
+    cuza.retrieveSamples();
 }
 
-void DataProcessor::dispOutput(QGraphicsScene *graphScene)
+void DataProcessor::dispOutput(QLineSeries **series, QChart* chart)
 {
     Cuza& cuza = Cuza::get();
     bufLen = cuza.getNFFT();
-    if(graphScene) m_graphScene = graphScene;
+    if(chart) m_chart = chart;
+    if(series) m_lineseries = series;
     const unsigned couBuf = NCOUNT*bufLen;
-    unsigned viewWidth = m_graphScene->views().at(0)->width();
-    resizeCheck(couBuf, viewWidth);
-    m_graphScene->clear();
-    for(unsigned i = 0; i < couBuf-1; i++){
-        m_graphScene->addLine(i*scale, cuza.getBufValue(i), (i+1)*scale, cuza.getBufValue(i+1));
-       /* if(i == bufLen/10){
-            int p = 0;
-            p++;
-            break;
-        }*/
+    /*unsigned viewWidth = m_lineseries->views().at(0)->width();
+    resizeCheck(couBuf, viewWidth);*/
+    m_chart->removeAllSeries();
+    (*m_lineseries) = new QLineSeries;
+    (*m_lineseries)->clear();
+    for(unsigned i = 0; i < 65536/*couBuf-1*/; i++){
+        // 220121
+        // переделать на qtcharts
+        /*qDebug() << cuza.getSample(i);*/
+        (*m_lineseries)->append(i, cuza.getSample(i));
+        // m_graphScene->addLine(i*scale, cuza.getSample(i)/20, (i+1)*scale, cuza.getSample(i)/20);
     }
+    m_chart->addSeries((*m_lineseries));
+    m_chart->createDefaultAxes();
 }
 
 unsigned DataProcessor::getScale() const
@@ -58,8 +61,8 @@ void DataProcessor::setScale(const double& value)
 {
     Q_ASSERT(value > 0);
     const unsigned couBuf = NCOUNT*bufLen;
-    unsigned viewWidth = m_graphScene->views().at(0)->width();
-    if(couBuf*scale*value < viewWidth) return;
+    //unsigned viewWidth = m_lineseries->views().at(0)->width();
+    //if(couBuf*scale*value < viewWidth) return;
     scale *= value;
     dispOutput();
 }

@@ -5,6 +5,7 @@
 #include <QVector>
 #include <QDebug>
 #include <cmath>
+#include <math.h>
 
 // типы
 // Тип выводимого на график спектра.
@@ -179,6 +180,8 @@ public:
     void resizeBuffer(unsigned size);
     size_t getBufferSize() const;
     uchar getBufValue(const unsigned i);
+    void retrieveSamples();
+    qint16 getSample(const unsigned i);
 
     operator QString() const;
 private:
@@ -249,6 +252,7 @@ private:
     QList<QVector<unsigned>> coefNums;
 
     uchar*       mainbuffer;
+    qint16*      sampbuffer;
 signals:
 
 };
