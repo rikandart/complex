@@ -36,11 +36,7 @@ void DataProcessor::dispOutput(QLineSeries **series, QChart* chart)
     (*m_lineseries) = new QLineSeries;
     (*m_lineseries)->clear();
     for(unsigned i = 0; i < 65536/*couBuf-1*/; i++){
-        // 220121
-        // переделать на qtcharts
-        /*qDebug() << cuza.getSample(i);*/
         (*m_lineseries)->append(i, cuza.getSample(i));
-        // m_graphScene->addLine(i*scale, cuza.getSample(i)/20, (i+1)*scale, cuza.getSample(i)/20);
     }
     m_chart->addSeries((*m_lineseries));
     m_chart->createDefaultAxes();

@@ -18,6 +18,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    chartview.cpp \
     cuza.cpp \
     dataprocessor.cpp \
     error.cpp \
@@ -28,6 +29,7 @@ SOURCES += \
     mainwindow.cpp
 
 HEADERS += \
+    chartview.h \
     cuza.h \
     dataprocessor.h \
     error.h \

@@ -15,6 +15,7 @@
 #include <QValueAxis>
 #include <QGraphicsScene>
 #include <QPointF>
+#include "chartview.h"
 #include "graphview.h"
 #include "dataprocessor.h"
 #include "iniprocessor.h"
@@ -42,7 +43,7 @@ private:
     QFileSystemModel *m_qfsm;
     GraphView * m_graphView;
     QGraphicsScene * m_graphScene;
-    QChartView* m_chartView;
+    ChartView* m_chartView;
     QChart* m_chart;
     QLineSeries* m_series;
     QSplitter* splitter;
