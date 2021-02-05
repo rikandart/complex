@@ -1,4 +1,5 @@
 #include "cuza.h"
+#include <QThread>
 
 Cuza Cuza::obj;
 
@@ -6,7 +7,8 @@ Cuza::Cuza(QObject *parent) : QObject(parent){}
 
 Cuza::~Cuza()
 {
-    delete mainbuffer;
+    if(sampbuffer) delete[] sampbuffer;
+    if(mainbuffer) delete[] mainbuffer;
 }
 
 uchar *Cuza::getMainbuffer() const
@@ -25,18 +27,17 @@ void Cuza::resizeBuffer(unsigned size)
 {
     // удаляем старый буфер и создаем новый
     if (mainbuffer){
-        delete mainbuffer;
-        next_i = 0;
+        delete[] mainbuffer;
+        mainbuffer = NULL;
     }
+    next_i = 0;
     mainbuffer = new uchar[size];
     mainBufferSize = size;
-    qDebug() << "Main buffer size" << mainBufferSize;
 }
 
 size_t Cuza::getBufferSize() const
 {
     return mainBufferSize;
-    // return sizeof (mainbuffer);
 }
 
 uchar Cuza::getBufValue(const unsigned i)
@@ -47,30 +48,17 @@ uchar Cuza::getBufValue(const unsigned i)
 
 void Cuza::retrieveSamples()
 {
-    quint8 mask = 0b00001111;
-    if(sampbuffer) delete sampbuffer;
+    if(sampbuffer) delete[] sampbuffer;
     sampbuffer = new qint16[mainBufferSize/2];
-    auto reversebits = [](quint16 number)->quint16{
-        quint16 mask1_1 = 0b111111000000, mask1_2 = 0b000000111111,
-                mask2_1 = 0b111000111000, mask2_2 = 0b000111000111,
-                mask3_1 = 0b100100100100, mask3_2 = 0b001001001001, mask3_3 = 0b010010010010;
-        number = (number & mask1_1) >> 6 | (number & mask1_2) << 6;
-        number = (number & mask2_1) >> 3 | (number & mask2_2) << 3;
-        number = (number & mask3_1) >> 2 | (number & mask3_2) << 2 | (number & mask3_3);
-        return number;
-    };
     for(unsigned i = 0; i < mainBufferSize/2; i++){
-        quint16 tmp = (quint16(mask & mainbuffer[i*2]) << 4) + mainbuffer[i*2+1];
-        //qDebug() << tmp << QString::number(tmp, 2);
-        tmp = reversebits(tmp);
-        //qDebug() << tmp << QString::number(tmp, 2);
-        qint16 tmp2 = tmp;
-        if((2048&tmp) >> 11){
-            tmp2 = -(~(tmp-1)-61440);
-            //qDebug() << "negative" << tmp2 << QString::number(tmp2, 2);
-        }
-        sampbuffer[i] = tmp2;
+        qint16 sample_mask = static_cast<qint16>(pow(2, sampBitWidth)) - 1,
+               inv_mask = ~sample_mask,
+               sign_mask = static_cast<qint16>(pow(2, sampBitWidth-1));
+        sampbuffer[i] = (((qint16*)mainbuffer)[i]) & sample_mask;
+        if(sampbuffer[i] & sign_mask) sampbuffer[i] |= inv_mask;
     }
+    delete[] mainbuffer;
+    mainbuffer = NULL;
 }
 
 qint16 Cuza::getSample(const unsigned i)

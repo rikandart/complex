@@ -21,6 +21,7 @@ SOURCES += \
     chartview.cpp \
     cuza.cpp \
     dataprocessor.cpp \
+    deprecated-code.cpp \
     error.cpp \
     graphview.cpp \
     iniprocessor.cpp \

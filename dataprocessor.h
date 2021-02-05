@@ -26,18 +26,19 @@ public:
     ~DataProcessor();
     // чтение файла
     void Read(const QString& filename);
-    void dispOutput(QLineSeries** series = nullptr, QChart* chart = nullptr);
+    // рисует график отсчетов из файла
+    // запоминает указатели на серию точек и самого графика
+    // вызов без аргументов перерисовывает график
+    void oscOutput(QLineSeries** series = nullptr, QChart* chart = nullptr);
     // расчет спектра
 //    QVector<float> getSpectrum();
-    // выдача данных
-    // smth getData();
 
     unsigned getScale() const;
     void resizeCheck(const unsigned len, const unsigned width);
 private:
     double scale = 1;
-    QLineSeries** m_lineseries;
-    QChart* m_chart;
+    QLineSeries** m_lineseries = nullptr;
+    QChart* m_chart = nullptr;
     size_t bufLen = 0;
 public slots:
     void setScale (const double& value);
