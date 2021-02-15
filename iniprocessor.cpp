@@ -9,7 +9,7 @@ bool INIProcessor::read(const QString& filename){
     Q_ASSERT(filename.contains(".ini", Qt::CaseInsensitive));
     if(QFileInfo(filename).exists()){
         QSettings ini(filename, QSettings::IniFormat);
-        if(validate(ini) && ini.status() == QSettings::NoError){
+        if(/*validate(ini) && */ini.status() == QSettings::NoError){
 
             auto readFloat = [](const QVariant& var)->float{
                 // если целая и дробная части разделены запятой,
@@ -19,23 +19,27 @@ bool INIProcessor::read(const QString& filename){
                 else var.toFloat();
             };
 
-            cuza.setFreq(readFloat(ini.value("MAIN/freq")));
-            cuza.setIfFreq(readFloat(ini.value("MAIN/Fpch")));
-            cuza.setFd(readFloat(ini.value("MAIN/discrFreq")));
-            cuza.setVersion(ini.value("MAIN/version").toInt());
+            cuza.setFreq(readFloat(ini.value("MAIN/freq", 1812.5)));
+            cuza.setIfFreq(readFloat(ini.value("MAIN/Fpch", 262.5)));
+            cuza.setFd(readFloat(ini.value("MAIN/discrFreq", 350)));
+            cuza.setVersion(ini.value("MAIN/version", 0).toInt());
             if(cuza.getVersion() == 3)
                 cuza.setFreqInv((cuza.getFreq() < 562.5)
                      || (cuza.getFreq() > 3932.5) ? -1 : 1);
-            else cuza.setFreqInv(ini.value("MAIN/freq_inv").toInt());
-            cuza.setMaxSamples(ini.value("MAIN/MAX_SAMPLES").toUInt());
-            cuza.setBuffLength(ini.value("MAIN/bufLength").toUInt());
-            cuza.setNFFT(ini.value("MAIN/NFFT").toUInt());
+            else cuza.setFreqInv(ini.value("MAIN/freq_inv", 1).toInt());
+            cuza.setMaxSamples(ini.value("MAIN/MAX_SAMPLES", 1024 * 1024 * 128).toUInt());
+            cuza.setBuffLength(ini.value("MAIN/bufLength", 1024 * 1024 * 128 * 2).toUInt());
+            if(ini.value("MAIN/N_FFT").toUInt())
+                cuza.setNFFT(ini.value("MAIN/n_fft").toUInt());
+            else
+                cuza.setNFFT(ini.value("MAIN/NFFT", 8).toUInt());
             // Размер сэмпла в байтах (2)
             cuza.setSampWidth(ini.value("MAIN/sample_width", 2).toUInt());
             // Размер сэмпла в битах (12)
             cuza.setSampBitWidth(ini.value("MAIN/sample_bit_width", 12).toUInt());
             // Величина децимации (2)
             cuza.setDecimationRatio(ini.value("MAIN/decimation_ratio", 2).toUInt());
+            cuza.setSampWinLen(2*cuza.getDecimationRatio()*(1<<cuza.getNFFT()));
             cuza.setPorog(ini.value("MAIN/porog", 20).toDouble());
             cuza.setPorogFFT(ini.value("MAIN/POROG_FFT", 0).toDouble());
             cuza.setSyncStart(ini.value("TIME/Sync_StartL", 0).toInt() |
@@ -76,6 +80,7 @@ bool INIProcessor::read(const QString& filename){
 }
 
 // проверка ключей
+// deprecated
 bool INIProcessor::validate(const QSettings& ini){
     QStringList keys = ini.allKeys();
     for(QString str : keys){

@@ -55,5 +55,7 @@ private:
 public slots:
     // слот вызываемый по готовности приложения
     void appReady();
+    void redrawOsc(Qt::Key);
+signals:
 };
 #endif // MAINWINDOW_H

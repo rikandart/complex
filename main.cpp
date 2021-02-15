@@ -14,9 +14,9 @@ int main(int argc, char *argv[])
     /*Form form;
     form.show();*/
 #ifndef QT_DEBUG
-    QSplashScreen splash(QPixmap("C:/Users/Pizhun_VD/Documents/planirovka.jpg"));
+    /*QSplashScreen splash(QPixmap("C:/Users/Pizhun_VD/Documents/planirovka.jpg"));
     splash.show();
-    QThread::sleep(5);
+    QThread::sleep(5);*/
 #endif
 
 //        for(int i = 0; i< points.size(); i++)

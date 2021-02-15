@@ -9,6 +9,7 @@
 #include <QGraphicsView>
 #include <QtCharts/QChart>
 #include <QtCharts/QLineSeries>
+#include <QValueAxis>
 #include "cuza.h"
 #define NCOUNT 100
 using namespace QtCharts;

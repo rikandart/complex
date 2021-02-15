@@ -1,5 +1,7 @@
 #include "cuza.h"
 #include <QThread>
+#include <bitset>
+#include <string>
 
 Cuza Cuza::obj;
 
@@ -11,6 +13,73 @@ Cuza::~Cuza()
     if(mainbuffer) delete[] mainbuffer;
 }
 
+quint16 Cuza::getSync() const
+{
+    return sync;
+}
+
+void Cuza::retriveWinTime()
+{
+    for(unsigned i = 16; i < 64; i++){
+        winTime |= ((mainbuffer[i*2+1] >> 7) & 1) << (48-(i-16));
+        if (i == 16)
+            qDebug() << ((mainbuffer[i*2+1] >> 7) & 1);
+    }
+    qDebug() << "winTime" << winTime << QString::number(winTime, 2);
+    // winTime /= fd;
+    qDebug() << "winTime/fd" << winTime/fd << QString::number(winTime, 2);
+}
+
+unsigned Cuza::getWinIndex() const
+{
+    return winIndex;
+}
+
+void Cuza::setWinIndex(const unsigned &value)
+{
+    winIndex = value;
+}
+
+QString Cuza::getFilename() const
+{
+    return filename;
+}
+
+void Cuza::setFilename(const QString &value)
+{
+    winIndex = 0;
+    winTime = 0;
+    sync = 0;
+    filename = value;
+}
+
+unsigned Cuza::incWinIndex()
+{
+    if(winIndex == winCount) winIndex = 0;
+    return winIndex++;
+}
+
+unsigned Cuza::decWinIndex()
+{
+    if(winIndex == 1) return --winIndex;
+    if(winIndex > 1 ) return (winIndex -= 2);
+}
+
+void Cuza::cleanMainBuffer()
+{
+    resizeBuffer(mainBufferSize);
+}
+
+unsigned Cuza::getWinCount() const
+{
+    return winCount;
+}
+
+void Cuza::setWinCount(const unsigned &value)
+{
+    winCount = value;
+}
+
 uchar *Cuza::getMainbuffer() const
 {
     return mainbuffer;
@@ -18,7 +87,7 @@ uchar *Cuza::getMainbuffer() const
 
 void Cuza::appendToBuffer(uchar value)
 {
-    Q_ASSERT(next_i < buffLength);
+    Q_ASSERT(next_i < mainBufferSize);
     mainbuffer[next_i] = value;
     next_i++;
 }
@@ -50,10 +119,10 @@ void Cuza::retrieveSamples()
 {
     if(sampbuffer) delete[] sampbuffer;
     sampbuffer = new qint16[mainBufferSize/2];
+    qint16 sample_mask = static_cast<qint16>(pow(2, sampBitWidth)) - 1,
+           inv_mask = ~sample_mask,
+           sign_mask = static_cast<qint16>(pow(2, sampBitWidth-1));
     for(unsigned i = 0; i < mainBufferSize/2; i++){
-        qint16 sample_mask = static_cast<qint16>(pow(2, sampBitWidth)) - 1,
-               inv_mask = ~sample_mask,
-               sign_mask = static_cast<qint16>(pow(2, sampBitWidth-1));
         sampbuffer[i] = (((qint16*)mainbuffer)[i]) & sample_mask;
         if(sampbuffer[i] & sign_mask) sampbuffer[i] |= inv_mask;
     }
@@ -65,6 +134,16 @@ qint16 Cuza::getSample(const unsigned i)
 {
     Q_ASSERT(i < mainBufferSize/2);
     return sampbuffer[i];
+}
+
+void Cuza::retrieveSync()
+{
+    // в 7м бите каждого второго байта первых 16ти слов
+    // содержится бит синхроимпульса
+    for(unsigned i = 0; i < 16; i++){
+        sync |= ((mainbuffer[i*2+1] >> 7) & 1) << (16-i);
+    }
+    qDebug() << "sync" << QString::number(sync, 2) << QString::number(sync, 2).length();
 }
 
 Cuza::operator QString() const
@@ -396,6 +475,7 @@ unsigned Cuza::getSampWinLen() const
 void Cuza::setSampWinLen(const unsigned &value)
 {
     sampWinLen = value;
+    resizeBuffer(2*sampWinLen);
 }
 
 unsigned Cuza::getDecimationRatio() const

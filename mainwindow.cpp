@@ -16,6 +16,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->fileTree->setModel(m_qfsm);
     ui->fileTree->setSortingEnabled(false);
     m_dataPr = new DataProcessor;
+    // m_dataPr->dispOutput();
     graphTabInit();
     QTimer::singleShot(0, this, SLOT(appReady()));
     /*splitter = new QSplitter(this->centralWidget());
@@ -28,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent)
     setPath(m_qfsm->myComputer().toString());
 #else
     if(!QHostInfo::localHostName().compare("NIO-72-W11", Qt::CaseInsensitive))
-        this->setPath("E:/CUZADATA/2009-SIRIUS/2014/04/15");
+        this->setPath("E:/CUZADATA/2009-SIRIUS/2009/05/14");
     else
         this->setPath("D:/cuza/CUZADATA/2009-SIRIUS/2014/04/15");
 #endif
@@ -72,8 +73,8 @@ void MainWindow::graphTabInit()
     ui->tab_2->setSizePolicy(ui->tabWidget->sizePolicy());
     m_chart = new QChart;
     m_chartView = new ChartView(m_chart, ui->tab_2);
-    ui->tab_2->grabGesture(Qt::PanGesture);
-    ui->tab_2->grabGesture(Qt::PinchGesture);
+    /*ui->tab_2->grabGesture(Qt::PanGesture);
+    ui->tab_2->grabGesture(Qt::PinchGesture);*/
     m_series = new QLineSeries();
     m_chart->addSeries(m_series);
     m_chart->createDefaultAxes();
@@ -84,6 +85,8 @@ void MainWindow::graphTabInit()
     m_chart->createDefaultAxes();
     m_chart->setTitle("Осциллограмма");
     m_chart->legend()->markers()[0]->setLabel("Сигнал");
+    QObject::connect(m_chartView, &ChartView::arrowPressed,
+                     this, &MainWindow::redrawOsc);
     // graphview
     // is used for db
     /*m_graphView = new GraphView(ui->tab_3);
@@ -92,12 +95,29 @@ void MainWindow::graphTabInit()
     m_graphView->setLineWidth(10);*/
     // QObject::connect(m_graphView, &GraphView::scaleChanged, m_dataPr, &DataProcessor::setScale);
     // m_graphView->resize(ui->tabWidget->width()-10, ui->tabWidget->height()-50);
-    // qDebug() << ui->tabWidget->size();
 }
 
 void MainWindow::appReady()
 {
     oldSize = ui->tabWidget->size();
+}
+
+void MainWindow::redrawOsc(Qt::Key key)
+{
+    auto redraw = [&]()->void{
+        m_dataPr->Read(Cuza::get().getFilename());
+        m_dataPr->oscOutput(&m_series, m_chart);
+        m_chartView->setUpdatesEnabled(true);
+    };
+    switch(key){
+        case Qt::Key_Right:
+            redraw();
+        break;
+        case Qt::Key_Left:
+            Cuza::get().decWinIndex();
+            redraw();
+        break;
+    }
 }
 
 
@@ -113,8 +133,13 @@ void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
         INIProcessor ini;
         if(ini.read(m_qfsm->filePath(index).
            replace(".dat", ".ini", Qt::CaseInsensitive))){
+            Cuza& cuza = Cuza::get();
             m_dataPr->Read(m_qfsm->filePath(index));
-            m_dataPr->dispOutput(&m_series, m_chart);
+            m_dataPr->oscOutput(&m_series, m_chart);
+            ui->tabWidget->setCurrentWidget(ui->tab_2);
+            m_chartView->setAxisAndRange(static_cast<QValueAxis*>(m_chart->axisX()),
+                                         static_cast<QValueAxis*>(m_chart->axisY()));
+            m_chartView->setFocus();
         }
     }
 

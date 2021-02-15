@@ -1,6 +1,8 @@
 #ifndef CUZA_H
 #define CUZA_H
 
+// этот класс хранит сигнал и его параметры
+
 #include <QObject>
 #include <QVector>
 #include <QDebug>
@@ -78,6 +80,7 @@ public:
     void setDecimationRatio(const unsigned &value);
 
     unsigned getSampWinLen() const;
+    // устанавливает длину окна в отсчетах и изменяет размер буфера
     void setSampWinLen(const unsigned &value);
 
     double getPorog() const;
@@ -182,8 +185,23 @@ public:
     uchar getBufValue(const unsigned i);
     void retrieveSamples();
     qint16 getSample(const unsigned i);
+    void retrieveSync();
+    quint16 getSync() const;
+    void retriveWinTime();
 
     operator QString() const;
+    unsigned getWinCount() const;
+    void setWinCount(const unsigned &value);
+
+    QString getFilename() const;
+    void setFilename(const QString &value);
+    // инкрементирует индекс окна и возвращает предыдущее значение индекса
+    unsigned incWinIndex();
+    unsigned decWinIndex();
+    void cleanMainBuffer();
+    unsigned getWinIndex() const;
+    void setWinIndex(const unsigned &value);
+
 private:
     explicit Cuza(QObject *parent = nullptr);
     ~Cuza();
@@ -214,7 +232,12 @@ private:
                 hidePoints = 0,     // сколько скрывать точек перед выводом на график
                 spectrogramPerekr = 0,// количество точек перекрытия гистограммы
                 freqSMRatio = 0,    // коэффициент усреднения (2,4,6,8 ...)
-                next_i = 0;         // индекс следующего элемента для записи в буфер
+                next_i = 0,         // индекс следующего элемента для записи в буфер
+                winCount = 0,       // количесвто окон
+                winIndex = 0;       // индекс окна
+
+    quint16     sync = 0;           // номер отсчета синхроимпульса
+    quint64     winTime = 0;        // время окна в отсчетах
 
 
     double      porog = 0.0,        // порог для измерений
@@ -253,6 +276,8 @@ private:
 
     uchar*       mainbuffer;
     qint16*      sampbuffer;
+    QString      filename = "";
+
 signals:
 
 };
