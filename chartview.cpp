@@ -15,6 +15,7 @@ ChartView::ChartView(QChart* chart, QWidget *parent): QChartView(chart, parent)
     this->setCursor(Qt::OpenHandCursor);
     this->setFocus();
     this->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
+//    this->setUpdatesEnabled(true);
 }
 
 void ChartView::setAxisAndRange(QValueAxis *axisX, QValueAxis *axisY)
@@ -244,7 +245,7 @@ void ChartView::mouseReleaseEvent(QMouseEvent *event)
 void ChartView::mouseMoveEvent(QMouseEvent *event)
 {
     m_mousePos = event->pos();
-    this->setUpdatesEnabled(true);
+    this->scene()->invalidate(this->sceneRect());
     if(chartmoving){
         int curx = event->x(),
             cury = event->y();
@@ -305,5 +306,4 @@ void ChartView::drawForeground(QPainter *painter, const QRectF &rect)
         painter->drawText(hint.topLeft() + QPointF(3, 12), "x: " + QString().sprintf("%4.4f",value.x()));
         painter->drawText(hint.topLeft() + QPointF(3, 25), "y: " + QString().sprintf("%4.4f",value.y()));
     }
-    this->setUpdatesEnabled(false);
 }

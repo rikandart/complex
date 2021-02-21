@@ -34,6 +34,7 @@ private:
     virtual void keyPressEvent(QKeyEvent *event);
     virtual void keyReleaseEvent(QKeyEvent *event);
     virtual void drawForeground(QPainter* painter, const QRectF& rect);
+//    virtual void paintEvent(QPaintEvent *event);
     void resetAxis(QValueAxis* axis);
     void resetZoomedAxis(QValueAxis* axis);
     void getZoomedAxes();
@@ -42,7 +43,7 @@ private:
     QPoint m_mousePos;
     QChart* m_chart;
     QValueAxis* m_axisX, *m_axisY;
-    QLineSeries* cross;
+    QPainter* m_painter;
     int     oldx = 0, oldy = 0,
             frstx = 0, frsty = 0;
     // сетка, первые GRIDCOUNT значений - сетка икса

@@ -31,7 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     if(!QHostInfo::localHostName().compare("NIO-72-W11", Qt::CaseInsensitive))
         this->setPath("E:/CUZADATA/2009-SIRIUS/2009/05/14");
     else
-        this->setPath("D:/cuza/CUZADATA/2009-SIRIUS/2014/04/15");
+        this->setPath("D:/cuza/CUZADATA/2009-SIRIUS/2009/05/14");
 #endif
 }
 
@@ -104,18 +104,18 @@ void MainWindow::appReady()
 
 void MainWindow::redrawOsc(Qt::Key key)
 {
-    auto redraw = [&]()->void{
-        m_dataPr->Read(Cuza::get().getFilename());
-        m_dataPr->oscOutput(&m_series, m_chart);
+    auto redraw = [&](bool prev = false)->void{
+        m_dataPr->oscOutput(&m_series, m_chart, prev);
         m_chartView->setUpdatesEnabled(true);
+        m_chartView->setAxisAndRange(static_cast<QValueAxis*>(m_chart->axisX()),
+                                     static_cast<QValueAxis*>(m_chart->axisY()));
     };
     switch(key){
         case Qt::Key_Right:
             redraw();
         break;
         case Qt::Key_Left:
-            Cuza::get().decWinIndex();
-            redraw();
+            redraw(true);
         break;
     }
 }
@@ -130,10 +130,8 @@ void MainWindow::on_pathTo_textChanged(const QString &arg1)
 
 void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
     if(m_qfsm->fileName(index).contains(".dat", Qt::CaseInsensitive)){
-        INIProcessor ini;
-        if(ini.read(m_qfsm->filePath(index).
+        if(INIProcessor().read(m_qfsm->filePath(index).
            replace(".dat", ".ini", Qt::CaseInsensitive))){
-            Cuza& cuza = Cuza::get();
             m_dataPr->Read(m_qfsm->filePath(index));
             m_dataPr->oscOutput(&m_series, m_chart);
             ui->tabWidget->setCurrentWidget(ui->tab_2);

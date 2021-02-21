@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <cmath>
 #include <math.h>
+#define THRESHOLD 100
 
 // типы
 // Тип выводимого на график спектра.
@@ -193,14 +194,7 @@ public:
     unsigned getWinCount() const;
     void setWinCount(const unsigned &value);
 
-    QString getFilename() const;
-    void setFilename(const QString &value);
-    // инкрементирует индекс окна и возвращает предыдущее значение индекса
-    unsigned incWinIndex();
-    unsigned decWinIndex();
     void cleanMainBuffer();
-    unsigned getWinIndex() const;
-    void setWinIndex(const unsigned &value);
 
 private:
     explicit Cuza(QObject *parent = nullptr);
@@ -233,8 +227,7 @@ private:
                 spectrogramPerekr = 0,// количество точек перекрытия гистограммы
                 freqSMRatio = 0,    // коэффициент усреднения (2,4,6,8 ...)
                 next_i = 0,         // индекс следующего элемента для записи в буфер
-                winCount = 0,       // количесвто окон
-                winIndex = 0;       // индекс окна
+                winCount = 0;       // количество окон
 
     quint16     sync = 0;           // номер отсчета синхроимпульса
     quint64     winTime = 0;        // время окна в отсчетах
@@ -276,7 +269,6 @@ private:
 
     uchar*       mainbuffer;
     qint16*      sampbuffer;
-    QString      filename = "";
 
 signals:
 

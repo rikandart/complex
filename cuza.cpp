@@ -20,49 +20,15 @@ quint16 Cuza::getSync() const
 
 void Cuza::retriveWinTime()
 {
+    winTime = 0;
     for(unsigned i = 16; i < 64; i++){
-        winTime |= ((mainbuffer[i*2+1] >> 7) & 1) << (48-(i-16));
+        winTime = (winTime << 1)|((mainbuffer[i*2+1] >> 7) & 1);
         if (i == 16)
             qDebug() << ((mainbuffer[i*2+1] >> 7) & 1);
     }
     qDebug() << "winTime" << winTime << QString::number(winTime, 2);
     // winTime /= fd;
     qDebug() << "winTime/fd" << winTime/fd << QString::number(winTime, 2);
-}
-
-unsigned Cuza::getWinIndex() const
-{
-    return winIndex;
-}
-
-void Cuza::setWinIndex(const unsigned &value)
-{
-    winIndex = value;
-}
-
-QString Cuza::getFilename() const
-{
-    return filename;
-}
-
-void Cuza::setFilename(const QString &value)
-{
-    winIndex = 0;
-    winTime = 0;
-    sync = 0;
-    filename = value;
-}
-
-unsigned Cuza::incWinIndex()
-{
-    if(winIndex == winCount) winIndex = 0;
-    return winIndex++;
-}
-
-unsigned Cuza::decWinIndex()
-{
-    if(winIndex == 1) return --winIndex;
-    if(winIndex > 1 ) return (winIndex -= 2);
 }
 
 void Cuza::cleanMainBuffer()
@@ -132,6 +98,7 @@ void Cuza::retrieveSamples()
 
 qint16 Cuza::getSample(const unsigned i)
 {
+    if(i >= mainBufferSize/2) qDebug() << "getSample error" << i;
     Q_ASSERT(i < mainBufferSize/2);
     return sampbuffer[i];
 }
@@ -140,10 +107,13 @@ void Cuza::retrieveSync()
 {
     // в 7м бите каждого второго байта первых 16ти слов
     // содержится бит синхроимпульса
+    qDebug() << "-------------";
+    sync = 0;
+    qDebug() << "sync before" << QString::number(sync, 2) << QString::number(sync, 2).length();
     for(unsigned i = 0; i < 16; i++){
-        sync |= ((mainbuffer[i*2+1] >> 7) & 1) << (16-i);
+        sync = (sync << 1)|((mainbuffer[i*2+1] >> 7) & 1);
     }
-    qDebug() << "sync" << QString::number(sync, 2) << QString::number(sync, 2).length();
+    qDebug() << "sync after" << QString::number(sync, 2) << QString::number(sync, 2).length();
 }
 
 Cuza::operator QString() const
@@ -474,8 +444,9 @@ unsigned Cuza::getSampWinLen() const
 
 void Cuza::setSampWinLen(const unsigned &value)
 {
-    sampWinLen = value;
-    resizeBuffer(2*sampWinLen);
+    sampWinLen = value; 
+    sampWinLen /= 2;
+    qDebug() << "sampWinLen in" << value << "sampWinLen out" << sampWinLen;
 }
 
 unsigned Cuza::getDecimationRatio() const
