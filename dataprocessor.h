@@ -10,6 +10,7 @@
 #include <QGraphicsView>
 #include <QtCharts/QChart>
 #include <QtCharts/QLineSeries>
+#include <QtCharts/QLegendMarker>
 #include <QValueAxis>
 #include "cuza.h"
 #define NCOUNT 100
@@ -33,7 +34,7 @@ public:
     // запоминает указатели на серию точек и самого графика
     // вызов без аргументов перерисовывает график
     // флаг prev для прорисовки предыдущего сигнала
-    void oscOutput(QLineSeries** series = nullptr, QChart* chart = nullptr, bool prev = false);
+    void oscOutput(QLineSeries*** series = nullptr, QChart* chart = nullptr, bool prev = false);
     // расчет спектра
 //    QVector<float> getSpectrum();
 
@@ -42,9 +43,9 @@ public:
 private:
     /*  win_offset - с какого окна начинать вывод отсчетов
      *  win_i - индекс этого окна   */
-    unsigned win_i = 0, win_offset = 0;
+    unsigned win_i = 0, offset = 0;
     double scale = 1;
-    QLineSeries** m_lineseries = nullptr;
+    QLineSeries*** m_lineseries = nullptr;
     QChart* m_chart = nullptr;
     size_t bufLen = 0;
 public slots:

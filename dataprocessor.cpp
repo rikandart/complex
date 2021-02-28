@@ -7,7 +7,7 @@ DataProcessor::~DataProcessor(){}
 
 void DataProcessor::Read(const QString &filename)
 {
-    win_i = win_offset = 0;
+    win_i = offset = 0;
     // считать лучше весь файл
     // длина окна определяется по поиску следующего сигнала синхронизации
     QFile file(filename);
@@ -15,16 +15,10 @@ void DataProcessor::Read(const QString &filename)
     QDataStream d_stream(&file);
     Cuza& cuza = Cuza::get();
     unsigned win_len = cuza.getSampWinLen();
-//    cuza.cleanMainBuffer();
-//    if(filename.compare(cuza.getFilename(), Qt::CaseSensitive)){
-
-//    }
     unsigned f_len = (file.size() >= cuza.getBuffLength()) ?
                       cuza.getBuffLength() : file.size();
-//    cuza.setFilename(filename);
     cuza.setWinCount(f_len/(2.0*win_len));
     cuza.resizeBuffer(f_len);
-//    d_stream.skipRawData(cuza.incWinIndex()*2*win_len);
     for(unsigned i = 0; i < f_len; i++){
         uchar element;
         d_stream >> element;
@@ -33,10 +27,9 @@ void DataProcessor::Read(const QString &filename)
 //    cuza.retrieveSync();
 //    cuza.retriveWinLen();
     cuza.retrieveSamples();
-//    cuza
 }
 
-void DataProcessor::oscOutput(QLineSeries **series, QChart* chart, bool prev)
+void DataProcessor::oscOutput(QLineSeries ***series, QChart* chart, bool prev)
 {
     Q_ASSERT(series != nullptr || m_lineseries != nullptr);
     Q_ASSERT(chart != nullptr || m_chart != nullptr);
@@ -46,141 +39,160 @@ void DataProcessor::oscOutput(QLineSeries **series, QChart* chart, bool prev)
     // ремув убирает все данные о выведенных точках на график, а также
     // почему-то удаляет все данные о точках из кучи
     m_chart->removeAllSeries();
-    (*m_lineseries) = new QLineSeries;
-    (*m_lineseries)->clear();
+    enum Chart {
+      SAMPS,    // отсчеты
+      ENV,      // огибающая
+    };
+    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++){
+        qDebug() << m_lineseries[i];
+        (*(m_lineseries[i])) = new QLineSeries;
+        // 260221 - почему-то не создается новое место в куче
+        qDebug() << "here";
+        qDebug() << (*m_lineseries[i]);
+        (*(m_lineseries[i]))->clear();
+    }
+
     // поиск сигнала по порогу
     const unsigned  sampling_rate = cuza.getFd(),
                     maxsamp = cuza.getMaxVisSamples(),
-                    bufsize = cuza.getBufferSize(),
-                    win_len = cuza.getSampWinLen(),
-                    win_count = cuza.getWinCount();
-    if(win_offset >= bufsize/2) win_offset = 0;
-    if(win_i >= win_count) win_i = 0;
+                    bufsize = cuza.getBufferSize();
+    static unsigned prev_offset = offset;
+    static bool next = false;
+    // назначение сдвига в зависимости от направления движения по записи
     if(prev){
-        if(!win_offset) win_offset = bufsize/2;
-        win_i = win_offset/win_len;
+        if(!next) // если был предыдущий сигнал
+            prev_offset = offset ? offset : bufsize/2-1;
+        else offset = prev_offset ? prev_offset : bufsize/2-1;
+        next = false;
+    } else {
+        if(!next) // если был предыдущий сигнал
+            offset = (prev_offset >= bufsize/2-1) ? 0 : prev_offset;
+        else {
+            offset = (offset >= bufsize/2-1) ? 0 : offset;
+            prev_offset = offset;
+        }
+        next = true;
     }
-    const unsigned short max_noise_samples = 10;
+    const unsigned short max_noise_samples = 10,
+                         max_end_noise_samples = 10*max_noise_samples;
 #define MAX_SAMP
 #ifndef MAX_SAMP
     for(unsigned i = 0; i < cuza.getMaxVisSamples(); i++){
             (*m_lineseries)->append(i, cuza.getSample(i));
     }
 #else
-    // поиск значения, превышающего порог
+    // поиск по всем отсчетам окна
+    // если есть флаг prev, то поиск проходит в другую сторону
     for(bool start = 0;
-        !start && (!prev ? win_offset < bufsize/2 - win_len : win_offset > 0);
-        !prev ? win_i++ : win_i--){
-        win_offset = win_i*win_len;
-        unsigned next_offset = (!prev ? (win_i+1) : (win_i-1)) * win_len;
-        if(next_offset >= bufsize/2) next_offset = 0;
-        // поиск по всем отсчетам окна
-        // если есть флаг prev, то поиск проходит в другую сторону
-        for(unsigned i = !prev ? win_offset : win_offset-1;
-            (!prev ? i < next_offset : i >= next_offset) && !start; !prev ? i++ : i--){
-            if(abs(cuza.getSample(i)) > THRESHOLD){
-                start = 1;
-                // чтобы начиналось не сразу с сигнала
-                if(win_offset != 0 && !(i%win_offset)) {
-                    for(unsigned tmp_i = win_offset, thrsh_cou = 0; thrsh_cou < 15*max_noise_samples; tmp_i--){
-                        int samp = cuza.getSample(tmp_i);
-                        if(abs(samp) > THRESHOLD){
-                            thrsh_cou = 0;
-                        } else {
-                            thrsh_cou++;
-                        }
-                        if(thrsh_cou >= max_noise_samples) win_offset = tmp_i;
-                        if(!(win_offset % win_len)) win_i = win_offset/win_len;
-                        if(win_i == UINT_MAX) win_i = 0;
-                    }
-                    qDebug() << "offset- 2" << "win_offset" << win_offset << "win_i" << win_i;
+        !start && (!prev ? offset < bufsize/2 : offset > 0);
+        !prev ? offset++ : offset--){
+        if(abs(cuza.getSample(offset)) > THRESHOLD){
+            start = 1;
+            // чтобы начиналось не сразу с сигнала
+            if(offset != 0) {
+                for(unsigned thrsh_cou = 0; thrsh_cou < max_end_noise_samples && (!prev ? offset > 0 : offset < bufsize/2-1);
+                    !prev ? offset-- : offset++){
+                    if(abs(cuza.getSample(offset)) > THRESHOLD) thrsh_cou = 0;
+                    else thrsh_cou++;
                 }
-//                qDebug() << "osc start point" << "win_i" << win_i << "win_offset" << win_offset <<
-//                            "bufsize" << bufsize << "sample at" << i;
             }
         }
     }
     // если не был достигнут конец буфера
-    if(win_offset < bufsize/2 - win_len){
-        // добавляет отсчеты в серию, пока не наткнется на окно, где отсчеты упадут ниже порога
+    if(offset < bufsize/2){
+        // добавляет отсчеты в серию, пока не наткнется на отсчеты ниже порога
         /*
          * start - флаг начала сигнала
          * thrsh_cou - счетчик отсчетов ниже порога
-         * delta - разница между концом окна и индексом текущего сэмпла
          * max_noise_samples - максимальное кол-во шумовых низкоуровневых отсчетов после начала сигнала
-         * достижение max_noise_samples означает, что сигнала закончился */
-        const unsigned start_win_offset = win_offset;
+         * достижение max_noise_samples означает, что сигнала закончился
+         */
+        unsigned start_offset = offset;
         if(!prev){
-            for(auto [i, start, thrsh_cou, delta] =
-                std::make_tuple(win_offset, false, 0, 0);
-                (i-start_win_offset < maxsamp) && (thrsh_cou >= max_noise_samples) ? delta > 1 : 1; i++){
-                qint16 samp = cuza.getSample(i);
-                // если конец окна, то меняем сдвиг
-                if(i % win_len == win_len-1) win_offset = (++win_i)*win_len;
-                // 21022021 отвязать оффсет от окон
-                /*if(thrsh_cou >= max_noise_samples && abs(samp) >= THRESHOLD){
-                    delta = 1;
-                    win_offset = i;
-                    continue;
-                }*/
+            for(auto [start, thrsh_cou] = std::make_tuple(false, 0);
+                (offset-start_offset+1 < maxsamp) && (thrsh_cou < max_end_noise_samples) && (offset < bufsize/2);
+                offset++){
+                qint16 samp = cuza.getSample(offset);
                 if(abs(samp) >= THRESHOLD && thrsh_cou != max_noise_samples){
                     thrsh_cou = 0;
                     if(!start) start = true;
                 }
-
                 if(abs(samp) < THRESHOLD && start){
                     thrsh_cou++;
-                    delta = win_len-1 - i%win_len;
-                    if(delta == 1){
+                    if(thrsh_cou == max_end_noise_samples){
                         /* проверяем средним скользящим окном есть ли наличие сигнала
                          * в выведенных отсчетах, потому что мог быть просто единичный выброс
                          * SWEEP_WINDOWS - максимум проходок
                          * meanwin_step - шаг по отсчетам
-                         * mean_thrsh_lower - счетчик средних значений ниже порога */
-                        const double meanwin_step = (i - start_win_offset + 1)/SWEEP_WINDOWS;
-                        unsigned mean_thrsh_lower = 0;
-                        for(unsigned j = 0; j < SWEEP_WINDOWS; j++){
+                         * signal - признак наличия сигнала */
+                        const double meanwin_step = (offset - start_offset + 1)/SWEEP_WINDOWS;
+                        bool signal = false;
+                        for(unsigned i = 0; i < SWEEP_WINDOWS && !signal; i++){
                             unsigned sum = 0;
-                            for(unsigned k = start_win_offset + j*meanwin_step; k < start_win_offset + (j+1)*meanwin_step; k++)
-                                sum += abs(cuza.getSample(k));
-                            if(sum/meanwin_step < THRESHOLD) mean_thrsh_lower++;
+                            for(unsigned j = start_offset + i*meanwin_step; j < start_offset + (i+1)*meanwin_step; j++)
+                                sum += abs(cuza.getSample(j));
+                            if(sum/meanwin_step >= THRESHOLD) signal = true;
                         }
-                        if(mean_thrsh_lower == SWEEP_WINDOWS){
+                        if(!signal){
                             thrsh_cou = 0;
-                            delta = 0;
                             start = 0;
                         }
-
                     }
                 }
-                (*m_lineseries)->append(i/*(1.0/sampling_rate)*/, samp);
+                (*m_lineseries[Chart::SAMPS])->append(offset*(1.0/sampling_rate), samp);
+                (*m_lineseries[Chart::ENV])->append(offset*(1.0/sampling_rate), abs(samp));
             }
-        }
-        else
-            for(auto [i, start, thrsh_cou, delta, mean] =
-                std::make_tuple(win_offset-1, false, 0, 0, 0.0);
-                (win_offset-i < maxsamp) && (thrsh_cou >= max_noise_samples) ? delta < win_len-1 : 1; i--){
-                qDebug() << "prev trying to get a sample at index" << i;
-                qint16 samp = cuza.getSample(i);
-                // если начало окна, то меняем сдвиг
-                if(i % win_len == 0) win_offset = (--win_i)*win_len;
-                (*m_lineseries)->append(i*(1.0/sampling_rate), samp);
-                if(abs(samp) >= THRESHOLD && thrsh_cou != max_noise_samples){
-                    thrsh_cou = 0;
-                    if(!start) start = true;
-                }
-                if(abs(samp) < THRESHOLD && start){
-                    thrsh_cou++;
-                    delta = win_len-1 - i%win_len;
-                    /*qDebug() << QString().sprintf("samp %3d    thrsh_i %3d    delta %3d", samp, i, delta);
-                    qDebug() << QString().sprintf("i+delta %3d", i+delta);*/
+        } else {
+                for(auto [start, thrsh_cou] = std::make_tuple(false, 0);
+                    (start_offset - offset + 1 < maxsamp) && (thrsh_cou < max_end_noise_samples);
+                    offset--){
+                    if(offset == UINT_MAX){
+                        // если достигнуто начало буфера
+                        offset = bufsize/2-1;
+                        start_offset = bufsize/2-1;
+                        (*m_lineseries[0])->clear();
+                        (*m_lineseries[1])->clear();
+                    }
+                    qint16 samp = cuza.getSample(offset);
+                    if(abs(samp) >= THRESHOLD && thrsh_cou != max_noise_samples){
+                        thrsh_cou = 0;
+                        if(!start) start = true;
+                    }
+                    if(abs(samp) < THRESHOLD && start){
+                        thrsh_cou++;
+                        if(thrsh_cou == max_end_noise_samples){
+                            /* проверяем средним скользящим окном есть ли наличие сигнала
+                             * в выведенных отсчетах, потому что мог быть просто единичный выброс
+                             * SWEEP_WINDOWS - максимум проходок
+                             * meanwin_step - шаг по отсчетам
+                             * signal - признак наличия сигнала */
+                            const double meanwin_step = (start_offset - offset + 1)/SWEEP_WINDOWS;
+                            bool signal = false;
+                            for(unsigned i = 0; i < SWEEP_WINDOWS && !signal; i++){
+                                unsigned sum = 0;
+                                for(unsigned j = offset + i*meanwin_step;
+                                    (j < offset + (i+1)*meanwin_step) && j < bufsize/2; j++)
+                                    sum += abs(cuza.getSample(j));
+                                if(sum/meanwin_step >= THRESHOLD) signal = true;
+                            }
+                            if(!signal){
+                                thrsh_cou = 0;
+                                start = 0;
+                            }
+                        }
+                    }
+                    (*m_lineseries[Chart::SAMPS])->append(offset*(1.0/sampling_rate), samp);
+                    (*m_lineseries[Chart::ENV])->append(offset*(1.0/sampling_rate), abs(samp));
                 }
             }
     }
 #endif
-    m_chart->addSeries((*m_lineseries));
+    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++)
+        m_chart->addSeries((*m_lineseries[i]));
     m_chart->createDefaultAxes();
     m_chart->axisY()->setRange(-2048, 2048);
+    m_chart->legend()->markers()[0]->setLabel("Сигнал");
+    m_chart->legend()->markers()[0]->setLabel("Огибающая");
 }
 
 unsigned DataProcessor::getScale() const

@@ -1,0 +1,78 @@
+diff --git a/dataprocessor.cpp b/dataprocessor.cpp
+index b069de3..abceba9 100644
+--- a/dataprocessor.cpp
++++ b/dataprocessor.cpp
+@@ -3,8 +3,7 @@
+ DataProcessor::DataProcessor(QObject *parent) : QObject(parent){
+ }
+ 
+-DataProcessor::~DataProcessor(){
+-}
++DataProcessor::~DataProcessor(){}
+ 
+ void DataProcessor::Read(const QString &filename)
+ {
+@@ -12,16 +11,22 @@ void DataProcessor::Read(const QString &filename)
+     file.open(QIODevice::ReadOnly);
+     QDataStream d_stream(&file);
+     Cuza& cuza = Cuza::get();
+-    unsigned f_len = (file.size() >= cuza.getBuffLength()) ?
+-                      cuza.getBuffLength() : file.size();
+-    cuza.resizeBuffer(f_len);
+-    unsigned offset_step = f_len/(2*cuza.getMaxVisSamples());
+-    unsigned step = 0;
+-    for(unsigned i = 0; i < f_len+1; i++){
++    unsigned win_len = cuza.getSampWinLen();
++    cuza.cleanMainBuffer();
++    if(filename.compare(cuza.getFilename(), Qt::CaseSensitive)){
++        unsigned f_len = (file.size() >= cuza.getBuffLength()) ?
++                          cuza.getBuffLength() : file.size();
++        cuza.setFilename(filename);
++        cuza.setWinCount(f_len/win_len);
++    }
++    d_stream.skipRawData(cuza.incWinIndex()*win_len);
++    for(unsigned i = 0; i < win_len; i++){
+         uchar element;
+         d_stream >> element;
+         cuza.appendToBuffer(element);
+     }
++    cuza.retrieveSync();
++    cuza.retriveWinTime();
+     cuza.retrieveSamples();
+ }
+ 
+@@ -32,18 +37,21 @@ void DataProcessor::oscOutput(QLineSeries **series, QChart* chart)
+     Cuza& cuza = Cuza::get();
+     if(chart) m_chart = chart;
+     if(series) m_lineseries = series;
+-    /*unsigned viewWidth = m_lineseries->views().at(0)->width();
+-    resizeCheck(couBuf, viewWidth);*/
+     // ремув убирает все данные о выведенных точках на график, а также
+     // почему-то удаляет все данные о точках из кучи
+     m_chart->removeAllSeries();
+     (*m_lineseries) = new QLineSeries;
+     (*m_lineseries)->clear();
+-    for(unsigned i = 0; i < cuza.getMaxVisSamples(); i++){
+-        (*m_lineseries)->append(i, cuza.getSample(i));
++    unsigned sampling_rate = cuza.getFd();
++    unsigned winlen = cuza.getSampWinLen(),
++             winIndex = cuza.getWinIndex();
++    double offset = (winIndex-1)*winlen/2.0;
++    for(unsigned i = 0; i < winlen/2; i++){
++        (*m_lineseries)->append((i+offset)*(1.0/sampling_rate), cuza.getSample(i));
+     }
+     m_chart->addSeries((*m_lineseries));
+     m_chart->createDefaultAxes();
++    m_chart->axisY()->setRange(-2048, 2048);
+ }
+ 
+ unsigned DataProcessor::getScale() const
+@@ -61,8 +69,4 @@ void DataProcessor::setScale(const double& value)
+ {
+     Q_ASSERT(value > 0);
+     const unsigned couBuf = NCOUNT*bufLen;
+-    //unsigned viewWidth = m_lineseries->views().at(0)->width();
+-    //if(couBuf*scale*value < viewWidth) return;
+-    scale *= value;
+-    oscOutput();
+ }

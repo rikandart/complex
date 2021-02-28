@@ -9,8 +9,13 @@ Cuza::Cuza(QObject *parent) : QObject(parent){}
 
 Cuza::~Cuza()
 {
-    if(sampbuffer) delete[] sampbuffer;
-    if(mainbuffer) delete[] mainbuffer;
+    if(sampbuffer)  delete[] sampbuffer;
+    if(mainbuffer)  delete[] mainbuffer;
+}
+
+unsigned short Cuza::getSeriesCount() const
+{
+    return m_series_count;
 }
 
 quint16 Cuza::getSync() const
@@ -83,7 +88,7 @@ uchar Cuza::getBufValue(const unsigned i)
 
 void Cuza::retrieveSamples()
 {
-    if(sampbuffer) delete[] sampbuffer;
+    if(sampbuffer)  delete[] sampbuffer;
     sampbuffer = new qint16[mainBufferSize/2];
     qint16 sample_mask = static_cast<qint16>(pow(2, sampBitWidth)) - 1,
            inv_mask = ~sample_mask,

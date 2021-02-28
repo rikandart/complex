@@ -45,7 +45,7 @@ private:
     QGraphicsScene * m_graphScene;
     ChartView* m_chartView;
     QChart* m_chart;
-    QLineSeries* m_series;
+    QLineSeries** m_series;
     QSplitter* splitter;
     DataProcessor* m_dataPr;
     QSize oldSize;
@@ -57,5 +57,6 @@ public slots:
     void appReady();
     void redrawOsc(Qt::Key);
 signals:
+    void rebuildGrid();
 };
 #endif // MAINWINDOW_H

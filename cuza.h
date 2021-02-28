@@ -196,6 +196,8 @@ public:
 
     void cleanMainBuffer();
 
+    unsigned short getSeriesCount() const;
+
 private:
     explicit Cuza(QObject *parent = nullptr);
     ~Cuza();
@@ -267,8 +269,12 @@ private:
     QVector<unsigned> coeffs;
     QList<QVector<unsigned>> coefNums;
 
+    // буфер из файла
     uchar*       mainbuffer;
+    // буфер отсчетов
     qint16*      sampbuffer;
+    // кол-во серий выводимы в диаграмму (chart)
+    const unsigned short m_series_count = 2;
 
 signals:
 

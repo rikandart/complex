@@ -16,7 +16,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->fileTree->setModel(m_qfsm);
     ui->fileTree->setSortingEnabled(false);
     m_dataPr = new DataProcessor;
-    // m_dataPr->dispOutput();
+    m_series = new QLineSeries*[Cuza::get().getSeriesCount()];
     graphTabInit();
     QTimer::singleShot(0, this, SLOT(appReady()));
     /*splitter = new QSplitter(this->centralWidget());
@@ -42,6 +42,9 @@ MainWindow::~MainWindow()
     /*delete m_graphView;
     delete m_graphScene;*/
     m_chart->removeAllSeries();
+    const unsigned short ser_count = Cuza::get().getSeriesCount();
+    for(unsigned i = 0; i < ser_count; i++) delete m_series[i];
+    delete[] m_series;
     delete m_chart;
     delete ui;
 }
@@ -63,6 +66,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
         QSize delta = ui->tabWidget->size() - oldSize;
         oldSize = ui->tabWidget->size();
         m_chartView->resize(m_chartView->size()+delta);
+        emit rebuildGrid();
         //m_graphView->resize(m_graphView->size()+delta);
         //if(!m_graphScene->items().isEmpty()) m_dataPr->dispOutput();
     }
@@ -75,18 +79,11 @@ void MainWindow::graphTabInit()
     m_chartView = new ChartView(m_chart, ui->tab_2);
     /*ui->tab_2->grabGesture(Qt::PanGesture);
     ui->tab_2->grabGesture(Qt::PinchGesture);*/
-    m_series = new QLineSeries();
-    m_chart->addSeries(m_series);
-    m_chart->createDefaultAxes();
-    m_chart->removeAllSeries();
-    m_series = new QLineSeries();
-    for(int i = -100; i < 100; i++) m_series->append(i, sqrt(i+100));
-    m_chart->addSeries(m_series);
-    m_chart->createDefaultAxes();
     m_chart->setTitle("Осциллограмма");
-    m_chart->legend()->markers()[0]->setLabel("Сигнал");
     QObject::connect(m_chartView, &ChartView::arrowPressed,
                      this, &MainWindow::redrawOsc);
+    QObject::connect(this, &MainWindow::rebuildGrid,
+                     m_chartView, &ChartView::checkGrid);
     // graphview
     // is used for db
     /*m_graphView = new GraphView(ui->tab_3);

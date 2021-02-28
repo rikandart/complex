@@ -1,14 +1,15 @@
 #ifndef CHARTVIEW_H
 #define CHARTVIEW_H
 
-#include <vector>
+#include <math.h>
 #include <QObject>
 #include <QDebug>
 #include <QCursor>
-#include <QStack>
 #include <QValueAxis>
 #include <QtCharts/QChartView>
 #include <QtCharts/QLineSeries>
+#include <QtCharts/QLegendMarker>
+#include <cuza.h>
 
 using namespace QtCharts;
 #define ZoomCoef 2
@@ -39,10 +40,11 @@ private:
     void resetZoomedAxis(QValueAxis* axis);
     void getZoomedAxes();
     void drawCross(const QPointF point);
+    void buildGrid();
     QPointF nearestNode(float x, float y);
     QPoint m_mousePos;
-    QChart* m_chart;
-    QValueAxis* m_axisX, *m_axisY;
+    QChart* m_chart = nullptr;
+    QValueAxis* m_axisX = nullptr, *m_axisY = nullptr;
     QPainter* m_painter;
     int     oldx = 0, oldy = 0,
             frstx = 0, frsty = 0;
@@ -54,14 +56,15 @@ private:
     unsigned short zoomcountX = 0, zoomcountY = 0;
     const unsigned short hintWidth = 80, hintHeight = 30,
                          hintShift = 10, hintPadding = 1;
-    double minX = 0, maxX = 0, minY = 0, maxY = 0,
-           zoomedminX = 0, zoomedmaxX = 0,
-           zoomedminY = 0, zoomedmaxY = 0;
+    double  minX = 0, maxX = 0, minY = 0, maxY = 0,
+            zoomedminX = 0, zoomedmaxX = 0,
+            zoomedminY = 0, zoomedmaxY = 0;
     bool    chartmoving = false;
     bool    anchorX = false, anchorY = false,
             xmoving = false, ymoving = false;
 signals:
     void arrowPressed(Qt::Key);
 public slots:
+    void checkGrid();
 };
 #endif // CHARTVIEW_H
