@@ -42,8 +42,8 @@ MainWindow::~MainWindow()
     /*delete m_graphView;
     delete m_graphScene;*/
     m_chart->removeAllSeries();
-    const unsigned short ser_count = Cuza::get().getSeriesCount();
-    for(unsigned i = 0; i < ser_count; i++) delete m_series[i];
+//    const unsigned short ser_count = Cuza::get().getSeriesCount();
+//    for(unsigned i = 0; i < ser_count; i++) delete m_series[i];
     delete[] m_series;
     delete m_chart;
     delete ui;
@@ -102,7 +102,7 @@ void MainWindow::appReady()
 void MainWindow::redrawOsc(Qt::Key key)
 {
     auto redraw = [&](bool prev = false)->void{
-        m_dataPr->oscOutput(&m_series, m_chart, prev);
+        m_dataPr->oscOutput(m_series, m_chart, prev);
         m_chartView->setUpdatesEnabled(true);
         m_chartView->setAxisAndRange(static_cast<QValueAxis*>(m_chart->axisX()),
                                      static_cast<QValueAxis*>(m_chart->axisY()));
@@ -130,7 +130,7 @@ void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
         if(INIProcessor().read(m_qfsm->filePath(index).
            replace(".dat", ".ini", Qt::CaseInsensitive))){
             m_dataPr->Read(m_qfsm->filePath(index));
-            m_dataPr->oscOutput(&m_series, m_chart);
+            m_dataPr->oscOutput(m_series, m_chart);
             ui->tabWidget->setCurrentWidget(ui->tab_2);
             m_chartView->setAxisAndRange(static_cast<QValueAxis*>(m_chart->axisX()),
                                          static_cast<QValueAxis*>(m_chart->axisY()));

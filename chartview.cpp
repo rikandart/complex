@@ -76,6 +76,7 @@ void ChartView::drawCross(const QPointF point)
 
 void ChartView::buildGrid()
 {
+    // сетку необходимо сделать в отсчетах для приближения именно в нужном месте
     if(!m_axisX || !m_axisY) return;
     double  sampling_rate = Cuza::get().getFd(),
             l_minX = (m_axisX->min() >= minX ? m_axisX->min() : minX)*sampling_rate,
@@ -84,11 +85,11 @@ void ChartView::buildGrid()
             l_maxY = (m_axisY->max() <= maxY ? m_axisY->max() : maxY),
             stepX = (l_maxX - l_minX + 1)/double(GRIDCOUNT),
             stepY = (l_maxY - l_minY + 1)/double(GRIDCOUNT);
-    grid[0] = l_minX/sampling_rate;
+    grid[0] = l_minX;
     grid[GRIDCOUNT] = l_minY;
 //    qDebug() << "nodes" << grid[0] << grid[GRIDCOUNT];
     for(unsigned i = 1; i < GRIDCOUNT+1; i++){
-        grid[i] = grid[i-1] + stepX/sampling_rate;
+        grid[i] = grid[i-1] + stepX;
         grid[GRIDCOUNT+i] = grid[GRIDCOUNT+i-1] + stepY;
 //        qDebug() << "nodes" << grid[i] << grid[GRIDCOUNT+i];
     }
@@ -101,7 +102,9 @@ QPointF ChartView::nearestNode(float x, float y)
     {
         QPointF value = m_chart->mapToValue(QPointF(x, y));
 //        qDebug() << "value" << value;
-        x = value.x(), y = value.y();
+        // сводим полученные значения к отсчетам для согласованности
+        // с массивом сетки
+        x = value.x()*Cuza::get().getFd(), y = value.y();
     }
 //    qDebug() << x << y;
     float abs_diff[2*GRIDCOUNT+1];
@@ -124,7 +127,7 @@ QPointF ChartView::nearestNode(float x, float y)
             i_y = GRIDCOUNT+i;
         };
     }
-    point.setX(grid[i_x]);
+    point.setX(grid[i_x]/Cuza::get().getFd());
     point.setY(grid[i_y]);
 //    qDebug() << point;
     return m_chart->mapToPosition(point);
@@ -132,7 +135,6 @@ QPointF ChartView::nearestNode(float x, float y)
 
 void ChartView::checkGrid()
 {
-    qDebug() << "chart resize";
     buildGrid();
 }
 

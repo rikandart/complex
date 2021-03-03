@@ -29,9 +29,9 @@ void DataProcessor::Read(const QString &filename)
     cuza.retrieveSamples();
 }
 
-void DataProcessor::oscOutput(QLineSeries ***series, QChart* chart, bool prev)
+void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
 {
-    Q_ASSERT(series != nullptr || m_lineseries != nullptr);
+    Q_ASSERT(series != 0 || m_lineseries != nullptr);
     Q_ASSERT(chart != nullptr || m_chart != nullptr);
     Cuza& cuza = Cuza::get();
     if(chart) m_chart = chart;
@@ -43,13 +43,10 @@ void DataProcessor::oscOutput(QLineSeries ***series, QChart* chart, bool prev)
       SAMPS,    // отсчеты
       ENV,      // огибающая
     };
+    m_lineseries = new QLineSeries*[Cuza::get().getSeriesCount()];
     for(unsigned short i = 0; i < cuza.getSeriesCount(); i++){
-        qDebug() << m_lineseries[i];
-        (*(m_lineseries[i])) = new QLineSeries;
-        // 260221 - почему-то не создается новое место в куче
-        qDebug() << "here";
-        qDebug() << (*m_lineseries[i]);
-        (*(m_lineseries[i]))->clear();
+        m_lineseries[i] = new QLineSeries;
+        m_lineseries[i]->clear();
     }
 
     // поиск сигнала по порогу
@@ -139,8 +136,7 @@ void DataProcessor::oscOutput(QLineSeries ***series, QChart* chart, bool prev)
                         }
                     }
                 }
-                (*m_lineseries[Chart::SAMPS])->append(offset*(1.0/sampling_rate), samp);
-                (*m_lineseries[Chart::ENV])->append(offset*(1.0/sampling_rate), abs(samp));
+                m_lineseries[Chart::SAMPS]->append(offset/*(1.0/sampling_rate)*/, samp);
             }
         } else {
                 for(auto [start, thrsh_cou] = std::make_tuple(false, 0);
@@ -150,8 +146,8 @@ void DataProcessor::oscOutput(QLineSeries ***series, QChart* chart, bool prev)
                         // если достигнуто начало буфера
                         offset = bufsize/2-1;
                         start_offset = bufsize/2-1;
-                        (*m_lineseries[0])->clear();
-                        (*m_lineseries[1])->clear();
+                        m_lineseries[0]->clear();
+                        m_lineseries[1]->clear();
                     }
                     qint16 samp = cuza.getSample(offset);
                     if(abs(samp) >= THRESHOLD && thrsh_cou != max_noise_samples){
@@ -181,18 +177,25 @@ void DataProcessor::oscOutput(QLineSeries ***series, QChart* chart, bool prev)
                             }
                         }
                     }
-                    (*m_lineseries[Chart::SAMPS])->append(offset*(1.0/sampling_rate), samp);
-                    (*m_lineseries[Chart::ENV])->append(offset*(1.0/sampling_rate), abs(samp));
+                    m_lineseries[Chart::SAMPS]->append(offset/*(1.0/sampling_rate)*/, samp);
                 }
             }
+        // преобразование гильберта
+        const unsigned start_samp = !prev ? start_offset : offset,
+                end_samp = !prev ? offset : start_offset,
+                size = end_samp-start_samp+1;
+        std::vector<qint16> env;
+        envelope(env, start_samp, end_samp);
+//        for(unsigned i = start_samp; i <= end_samp; i++)
+//            m_lineseries[Chart::ENV]->append(i*(1.0/sampling_rate), env[i-start_samp]);
     }
 #endif
-    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++)
-        m_chart->addSeries((*m_lineseries[i]));
+//    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++)
+        m_chart->addSeries(m_lineseries[0]);
     m_chart->createDefaultAxes();
     m_chart->axisY()->setRange(-2048, 2048);
-    m_chart->legend()->markers()[0]->setLabel("Сигнал");
-    m_chart->legend()->markers()[0]->setLabel("Огибающая");
+    m_chart->legend()->markers()[Chart::SAMPS]->setLabel("Сигнал");
+//    m_chart->legend()->markers()[Chart::ENV]->setLabel("Огибающая");
 }
 
 unsigned DataProcessor::getScale() const
@@ -204,6 +207,81 @@ void DataProcessor::resizeCheck(const unsigned len, const unsigned width)
 {
     if(len*scale< width)
         scale = width/(double)(len);
+}
+
+complex_ptr DataProcessor::dft(const std::vector<qint16>& in, const unsigned N)
+{
+    complex *dft_ptr = new complex[N];
+    for(unsigned i = 0; i < N; i++)
+        for(unsigned j = 0; j < N; j++){
+            double arg = 2*M_PI*j*i/(double)N;
+            complex c(in[j]*cos(arg), -in[j]*sin(arg));
+            dft_ptr[i] += c;
+        }
+    return complex_ptr(dft_ptr);
+}
+
+complex_ptr DataProcessor::inv_dft(const complex_ptr spectrum, const unsigned N)
+{
+    complex* inv_dft = new complex[N];
+    for(unsigned i = 0; i < N; i++)
+        for(unsigned j = 0; j < N; j++){
+            double arg = 2*M_PI*j*i/(double)N;
+            inv_dft[i] += spectrum.get()[j]*complex(cos(arg)/N, sin(arg)/N);
+        }
+    return complex_ptr(inv_dft);
+}
+
+complex_ptr DataProcessor::fft(const std::vector<qint16>& in, const unsigned N)
+{
+    // алгоритм Кули-Тьюки
+    if(N == 2) return dft(in, N);
+    complex_ptr fft_ptr     =    fft(std::vector<qint16>(in.begin(), in.end()-N/2), N/2),
+                fft_ptr_2   =    fft(std::vector<qint16>(in.begin()+N/2, in.end()), N/2);
+    complex*    fft_res = new complex[N/2];
+    // объединение
+    for(unsigned i = 0; i < N/2; i++){
+        fft_res[i] = fft_ptr.get()[i*2]+fft_ptr_2.get()[i*2];
+    }
+    return complex_ptr(fft_res);
+}
+
+
+complex_ptr DataProcessor::inv_fft(const complex_ptr spectrum, const unsigned N)
+{
+    // неправильно считается
+    complex_ptr fft_ptr (new complex[N]);
+    for(unsigned i = 0; i < N; i++){
+        complex sum(0,0);
+        for(unsigned j = 0; j < N/2; j++){
+            double arg = j*2*i*2*M_PI/(double)N;
+            sum += complex(cos(arg)/N, -sin(arg)/N);
+        }
+        fft_ptr.get()[i] = sum;
+    }
+    return fft_ptr;
+}
+
+complex_ptr DataProcessor::hilbert(const std::vector<qint16>& in, const unsigned N)
+{
+    complex_ptr fft_ptr = fft(in, N);
+
+    return inv_fft(dft_ptr, N);
+}
+
+void DataProcessor::envelope(std::vector<qint16>& out, const unsigned start, const unsigned end)
+{
+    Cuza& cuza = Cuza::get();
+    unsigned size = end-start+1;
+    if(size%2) {
+        out.resize(++size);
+        out[end+1] = 0;
+    } else out.resize(size);
+    for(unsigned i = start; i <= end; i++)
+        out[i-start] = cuza.getSample(i);
+    complex_ptr hil = hilbert(out, size);
+    for(unsigned i = 0; i < end-start+1; i++)
+        out[i] = abs(hil.get()[i]);
 }
 
 void DataProcessor::setScale(const double& value)
