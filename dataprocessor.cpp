@@ -40,8 +40,10 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
     // почему-то удаляет все данные о точках из кучи
     m_chart->removeAllSeries();
     enum Chart {
-      SAMPS,    // отсчеты
-      ENV,      // огибающая
+      SAMPS,            // отсчеты
+      ENV,              // огибающая
+      PHASE_SPECTRUM,   // фазовый спектр
+      AMP_SPECTRUM,     // амплитудный спектр
     };
     m_lineseries = new QLineSeries*[Cuza::get().getSeriesCount()];
     for(unsigned short i = 0; i < cuza.getSeriesCount(); i++){
@@ -72,10 +74,10 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
     }
     const unsigned short max_noise_samples = 10,
                          max_end_noise_samples = 10*max_noise_samples;
-#define MAX_SAMP
-#ifndef MAX_SAMP
+//#define MAX_SAMP
+#ifdef MAX_SAMP
     for(unsigned i = 0; i < cuza.getMaxVisSamples(); i++){
-            (*m_lineseries)->append(i, cuza.getSample(i));
+            m_lineseries[Chart::SAMPS]->append(i, cuza.getSample(i));
     }
 #else
     // поиск по всем отсчетам окна
@@ -136,7 +138,7 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
                         }
                     }
                 }
-                m_lineseries[Chart::SAMPS]->append(offset/*(1.0/sampling_rate)*/, samp);
+                m_lineseries[Chart::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
             }
         } else {
                 for(auto [start, thrsh_cou] = std::make_tuple(false, 0);
@@ -177,25 +179,42 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
                             }
                         }
                     }
-                    m_lineseries[Chart::SAMPS]->append(offset/*(1.0/sampling_rate)*/, samp);
+                    m_lineseries[Chart::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
                 }
             }
         // преобразование гильберта
         const unsigned start_samp = !prev ? start_offset : offset,
                 end_samp = !prev ? offset : start_offset,
                 size = end_samp-start_samp+1;
-        std::vector<qint16> env;
-        envelope(env, start_samp, end_samp);
-//        for(unsigned i = start_samp; i <= end_samp; i++)
-//            m_lineseries[Chart::ENV]->append(i*(1.0/sampling_rate), env[i-start_samp]);
+        qint16 env[size];
+        fftw_complex fft_res[size];
+        calc_fft_env(fft_res, env, start_samp, end_samp);
+        auto arg = [](const fftw_complex& fft_samp)->double{
+                double angle = atan(fft_samp[IMAG]/fft_samp[REAL]);
+// https://internal.ncl.ac.uk/ask/numeracy-maths-statistics/core-mathematics/pure-maths/algebra/modulus-and-argument.html
+                if(fft_samp[REAL] < 0){
+                    if(fft_samp[IMAG] < 0) return (angle - M_PI)*180/M_PI;
+                    return (angle + M_PI)*180/M_PI;
+                }
+                return angle*180/M_PI;
+        };
+        auto abs = [](const fftw_complex& fft_samp)->double{
+                return sqrt(pow(fft_samp[REAL], 2) + pow(fft_samp[IMAG], 2));
+        };
+        for(unsigned i = start_samp; i <= end_samp; i++){
+            m_lineseries[Chart::ENV]->append(i/**(1.0/sampling_rate)*/, env[i-start_samp]);
+            m_lineseries[Chart::PHASE_SPECTRUM]->append(i*(1.0/*/sampling_rate*/), arg(fft_res[i-start_samp]));
+            m_lineseries[Chart::AMP_SPECTRUM]->append(i*(1.0/*/sampling_rate*/), abs(fft_res[i-start_samp])/100);
+        }
+        qDebug() << "-----------------------------------------------";
     }
 #endif
-//    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++)
-        m_chart->addSeries(m_lineseries[0]);
+    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++)
+        m_chart->addSeries(m_lineseries[i]);
     m_chart->createDefaultAxes();
     m_chart->axisY()->setRange(-2048, 2048);
     m_chart->legend()->markers()[Chart::SAMPS]->setLabel("Сигнал");
-//    m_chart->legend()->markers()[Chart::ENV]->setLabel("Огибающая");
+    m_chart->legend()->markers()[Chart::ENV]->setLabel("Огибающая");
 }
 
 unsigned DataProcessor::getScale() const
@@ -209,16 +228,42 @@ void DataProcessor::resizeCheck(const unsigned len, const unsigned width)
         scale = width/(double)(len);
 }
 
-complex_ptr DataProcessor::dft(const std::vector<qint16>& in, const unsigned N)
+complex_ptr DataProcessor::dft(const std::vector<complex>& in, const unsigned N)
 {
     complex *dft_ptr = new complex[N];
     for(unsigned i = 0; i < N; i++)
         for(unsigned j = 0; j < N; j++){
             double arg = 2*M_PI*j*i/(double)N;
-            complex c(in[j]*cos(arg), -in[j]*sin(arg));
-            dft_ptr[i] += c;
+            dft_ptr[i] += in[j]*cos(arg), -in[j]*sin(arg);
         }
     return complex_ptr(dft_ptr);
+}
+
+void DataProcessor::fft(fftw_complex *in, fftw_complex *out, const unsigned N)
+{
+    // create a DFT plan
+    fftw_plan plan = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+    // execute the plan
+    fftw_execute(plan);
+    // do some cleaning
+    fftw_destroy_plan(plan);
+    fftw_cleanup();
+}
+
+void DataProcessor::ifft(fftw_complex *in, fftw_complex *out, const unsigned N)
+{
+    // create an IDFT plan
+    fftw_plan plan = fftw_plan_dft_1d(N, in, out, FFTW_BACKWARD, FFTW_ESTIMATE);
+    // execute the plan
+    fftw_execute(plan);
+    // do some cleaning
+    fftw_destroy_plan(plan);
+    fftw_cleanup();
+    // scale the output to obtain the exact inverse
+    for (int i = 0; i < N; ++i) {
+        out[i][REAL] /= N;
+        out[i][IMAG] /= N;
+    }
 }
 
 complex_ptr DataProcessor::inv_dft(const complex_ptr spectrum, const unsigned N)
@@ -232,56 +277,39 @@ complex_ptr DataProcessor::inv_dft(const complex_ptr spectrum, const unsigned N)
     return complex_ptr(inv_dft);
 }
 
-complex_ptr DataProcessor::fft(const std::vector<qint16>& in, const unsigned N)
+void DataProcessor::hilbert(fftw_complex* in, fftw_complex* out, const unsigned N)
 {
-    // алгоритм Кули-Тьюки
-    if(N == 2) return dft(in, N);
-    complex_ptr fft_ptr     =    fft(std::vector<qint16>(in.begin(), in.end()-N/2), N/2),
-                fft_ptr_2   =    fft(std::vector<qint16>(in.begin()+N/2, in.end()), N/2);
-    complex*    fft_res = new complex[N/2];
-    // объединение
-    for(unsigned i = 0; i < N/2; i++){
-        fft_res[i] = fft_ptr.get()[i*2]+fft_ptr_2.get()[i*2];
+#define FFT
+#ifdef FFT
+    fftw_complex in_scaled[N];
+    for(unsigned i = 1; i < N/2; i++){
+        in_scaled[i][REAL] = in[i][REAL] * 2;
+        in_scaled[i][IMAG] = in[i][IMAG] * 2;
     }
-    return complex_ptr(fft_res);
+    memset(&in_scaled[N/2+1], 0, N/2-1);
+    ifft(in_scaled, out, N);
+#else
+    complex_ptr dft_ptr = dft(in, N);
+    for(unsigned i = 1; i < N/2; i++)
+        dft_ptr.get()[i] *= 2;
+    memset(&dft_ptr.get()[N/2+1], 0, N/2-1);
+    return inv_dft(dft_ptr, N);
+#endif
 }
 
-
-complex_ptr DataProcessor::inv_fft(const complex_ptr spectrum, const unsigned N)
-{
-    // неправильно считается
-    complex_ptr fft_ptr (new complex[N]);
-    for(unsigned i = 0; i < N; i++){
-        complex sum(0,0);
-        for(unsigned j = 0; j < N/2; j++){
-            double arg = j*2*i*2*M_PI/(double)N;
-            sum += complex(cos(arg)/N, -sin(arg)/N);
-        }
-        fft_ptr.get()[i] = sum;
-    }
-    return fft_ptr;
-}
-
-complex_ptr DataProcessor::hilbert(const std::vector<qint16>& in, const unsigned N)
-{
-    complex_ptr fft_ptr = fft(in, N);
-
-    return inv_fft(dft_ptr, N);
-}
-
-void DataProcessor::envelope(std::vector<qint16>& out, const unsigned start, const unsigned end)
+void DataProcessor::calc_fft_env(fftw_complex* fft_res, qint16* env, const unsigned start, const unsigned end)
 {
     Cuza& cuza = Cuza::get();
-    unsigned size = end-start+1;
-    if(size%2) {
-        out.resize(++size);
-        out[end+1] = 0;
-    } else out.resize(size);
-    for(unsigned i = start; i <= end; i++)
-        out[i-start] = cuza.getSample(i);
-    complex_ptr hil = hilbert(out, size);
+    const unsigned N = end-start+1;
+    fftw_complex in[N], out_hil[N];
+    for(unsigned i = start; i <= end; i++){
+        in[i-start][REAL] = cuza.getSample(i);
+        in[i-start][IMAG] = 0;
+    }
+    fft(in, fft_res, end-start+1);
+    hilbert(fft_res, out_hil, N);
     for(unsigned i = 0; i < end-start+1; i++)
-        out[i] = abs(hil.get()[i]);
+        env[i] = abs(complex(out_hil[i][REAL], out_hil[i][IMAG]));
 }
 
 void DataProcessor::setScale(const double& value)

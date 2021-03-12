@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QFileSystemModel>
+#include <QStandardItemModel>
 #include <QDir>
 #include <QSplitter>
 #include <QResizeEvent>
@@ -41,6 +42,7 @@ private slots:
 private:
     Ui::MainWindow *ui;
     QFileSystemModel *m_qfsm;
+    QStandardItemModel *m_stim;
     GraphView * m_graphView;
     QGraphicsScene * m_graphScene;
     ChartView* m_chartView;
@@ -59,4 +61,10 @@ public slots:
 signals:
     void rebuildGrid();
 };
+
+class FileSystemModel: public QFileSystemModel{
+private:
+    virtual void setHeaderData();
+};
+
 #endif // MAINWINDOW_H

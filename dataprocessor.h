@@ -15,9 +15,14 @@
 #include <complex>
 #include <vector>
 #include <memory>
+#include <algorithm>
+#include <fftw3.h>
 #include "cuza.h"
 #define NCOUNT 100
 #define SWEEP_WINDOWS 5
+#define ENV_COEF 1000
+#define REAL 0
+#define IMAG 1
 using namespace QtCharts;
 
 typedef std::complex<double> complex;
@@ -47,6 +52,7 @@ public:
 
     unsigned getScale() const;
     void resizeCheck(const unsigned len, const unsigned width);
+    unsigned rightcount = 0;
 private:
     /*  win_offset - с какого окна начинать вывод отсчетов
      *  win_i - индекс этого окна   */
@@ -55,17 +61,22 @@ private:
     QLineSeries** m_lineseries = nullptr;
     QChart* m_chart = nullptr;
     size_t bufLen = 0;
+    unsigned fftN = 0;
+    bool hilb = false;
     // расчет прямого и обратного бпф и дпф
     // qint16_ptr - разделяемый указатель на отсчеты
     // spectrum - разделяемый указатель на спектр, N - размерность бпф или дпф
-    complex_ptr dft(const std::vector<qint16>& in, const unsigned N);
-    complex_ptr fft(const std::vector<qint16>& in, const unsigned N);
-    complex_ptr inv_fft(const complex_ptr spectrum, const unsigned N);
+    complex_ptr dft(const std::vector<complex>& in, const unsigned N);
+    void fft(fftw_complex *in, fftw_complex *out, const unsigned N);
+    void ifft(fftw_complex *in, fftw_complex *out, const unsigned N);
+    complex_ptr fft_inside(const std::vector<complex*>& in, const unsigned N);
+    complex_ptr inv_fft(const complex_ptr spectrum, unsigned N);
     complex_ptr inv_dft(const complex_ptr spectrum, const unsigned N);
     // преобразование гильберта для извлечения огибающей
-    complex_ptr hilbert(const std::vector<qint16>& in, const unsigned N);
-    // извлечение огибающей
-    void envelope(std::vector<qint16>& out, const unsigned start, const unsigned end);
+    void hilbert(fftw_complex* in,  fftw_complex* out, const unsigned N);
+    // расчет бпф и огибающей
+    // fft_res - комплексный спектр, env - огибающая
+    void calc_fft_env(fftw_complex* fft_res, qint16* env, const unsigned start, const unsigned end);
 public slots:
     void setScale (const double& value);
 };

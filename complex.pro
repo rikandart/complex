@@ -30,6 +30,7 @@ SOURCES += \
     mainwindow.cpp
 
 HEADERS += \
+    CppFFTW/include/fftw3.h \
     chartview.h \
     cuza.h \
     dataprocessor.h \
@@ -44,6 +45,12 @@ FORMS += \
 
 TRANSLATIONS += \
     complex_ru_RU.ts
+
+INCLUDEPATH += \
+    ./FFTW/ \
+
+LIBS += -L"C:/repos/complex/FFTW/" -llibfftw3-3
+#QMAKE_CFLAGS += C:/repos/complex/FFTW/lib/libfftw3-3.def
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

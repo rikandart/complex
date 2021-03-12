@@ -274,7 +274,7 @@ private:
     // буфер отсчетов
     qint16*      sampbuffer;
     // кол-во серий выводимы в диаграмму (chart)
-    const unsigned short m_series_count = 2;
+    const unsigned short m_series_count = 4;
 
 signals:
 

@@ -15,6 +15,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_qfsm->setNameFilterDisables(false);
     ui->fileTree->setModel(m_qfsm);
     ui->fileTree->setSortingEnabled(false);
+    m_stim = new QStandardItemModel(0, 4, this);
+    m_stim->setHeaderData(0, Qt::Horizontal, "Имя");
+    m_stim->setHeaderData(1, Qt::Horizontal, "Размер");
+    m_stim->setHeaderData(2, Qt::Horizontal, "Тип");
+    m_stim->setHeaderData(3, Qt::Horizontal, "Дата изменения");
+    ui->fileTree->header()->setModel(m_stim);
+    ui->fileTree->header()->resizeSection(0, 445);
     m_dataPr = new DataProcessor;
     m_series = new QLineSeries*[Cuza::get().getSeriesCount()];
     graphTabInit();
@@ -38,6 +45,7 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     //delete splitter;
+    delete m_stim;
     delete m_qfsm;
     /*delete m_graphView;
     delete m_graphScene;*/
@@ -110,9 +118,11 @@ void MainWindow::redrawOsc(Qt::Key key)
     switch(key){
         case Qt::Key_Right:
             redraw();
+            m_dataPr->rightcount++;
         break;
         case Qt::Key_Left:
             redraw(true);
+            m_dataPr->rightcount--;
         break;
     }
 }
