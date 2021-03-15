@@ -29,27 +29,19 @@ void DataProcessor::Read(const QString &filename)
     cuza.retrieveSamples();
 }
 
-void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
+void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
 {
     Q_ASSERT(series != 0 || m_lineseries != nullptr);
-    Q_ASSERT(chart != nullptr || m_chart != nullptr);
+    Q_ASSERT(charts != nullptr || m_charts != nullptr);
     Cuza& cuza = Cuza::get();
-    if(chart) m_chart = chart;
+    if(charts) m_charts = charts;
     if(series) m_lineseries = series;
     // ремув убирает все данные о выведенных точках на график, а также
     // почему-то удаляет все данные о точках из кучи
-    m_chart->removeAllSeries();
-    enum Chart {
-      SAMPS,            // отсчеты
-      ENV,              // огибающая
-      PHASE_SPECTRUM,   // фазовый спектр
-      AMP_SPECTRUM,     // амплитудный спектр
-    };
+    for(unsigned i = 0; i < cuza.getChartCount(); i++) m_charts[i]->removeAllSeries();
     m_lineseries = new QLineSeries*[Cuza::get().getSeriesCount()];
-    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++){
-        m_lineseries[i] = new QLineSeries;
-        m_lineseries[i]->clear();
-    }
+    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++)
+        (m_lineseries[i] = new QLineSeries)->clear();
 
     // поиск сигнала по порогу
     const unsigned  sampling_rate = cuza.getFd(),
@@ -138,7 +130,7 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
                         }
                     }
                 }
-                m_lineseries[Chart::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
+                m_lineseries[Series::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
             }
         } else {
                 for(auto [start, thrsh_cou] = std::make_tuple(false, 0);
@@ -148,8 +140,7 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
                         // если достигнуто начало буфера
                         offset = bufsize/2-1;
                         start_offset = bufsize/2-1;
-                        m_lineseries[0]->clear();
-                        m_lineseries[1]->clear();
+                        m_lineseries[Series::SAMPS]->clear();
                     }
                     qint16 samp = cuza.getSample(offset);
                     if(abs(samp) >= THRESHOLD && thrsh_cou != max_noise_samples){
@@ -179,42 +170,41 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart* chart, bool prev)
                             }
                         }
                     }
-                    m_lineseries[Chart::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
+                    m_lineseries[Series::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
                 }
             }
         // преобразование гильберта
         const unsigned start_samp = !prev ? start_offset : offset,
                 end_samp = !prev ? offset : start_offset,
                 size = end_samp-start_samp+1;
-        qint16 env[size];
-        fftw_complex fft_res[size];
-        calc_fft_env(fft_res, env, start_samp, end_samp);
-        auto arg = [](const fftw_complex& fft_samp)->double{
-                double angle = atan(fft_samp[IMAG]/fft_samp[REAL]);
-// https://internal.ncl.ac.uk/ask/numeracy-maths-statistics/core-mathematics/pure-maths/algebra/modulus-and-argument.html
-                if(fft_samp[REAL] < 0){
-                    if(fft_samp[IMAG] < 0) return (angle - M_PI)*180/M_PI;
-                    return (angle + M_PI)*180/M_PI;
-                }
-                return angle*180/M_PI;
-        };
+        fftw_complex fft_res[size], complex_sig[size];
+        calc_fft_comp_sig(fft_res, complex_sig, start_samp, end_samp);
         auto abs = [](const fftw_complex& fft_samp)->double{
                 return sqrt(pow(fft_samp[REAL], 2) + pow(fft_samp[IMAG], 2));
         };
+        auto arg = [](const fftw_complex& fft_samp)->double{
+            return atan(fft_samp[IMAG]/fft_samp[REAL])*180/M_PI;
+        };
         for(unsigned i = start_samp; i <= end_samp; i++){
-            m_lineseries[Chart::ENV]->append(i/**(1.0/sampling_rate)*/, env[i-start_samp]);
-            m_lineseries[Chart::PHASE_SPECTRUM]->append(i*(1.0/*/sampling_rate*/), arg(fft_res[i-start_samp]));
-            m_lineseries[Chart::AMP_SPECTRUM]->append(i*(1.0/*/sampling_rate*/), abs(fft_res[i-start_samp])/100);
+            m_lineseries[Series::ENV]->append(i/**(1.0/sampling_rate)*/, abs(complex_sig[i-start_samp]));
+            m_lineseries[Series::PHASE]->append(i*(1.0/*/sampling_rate*/),arg(complex_sig[i-start_samp]));
+            m_lineseries[Series::AMP]->append(i*(1.0/*/sampling_rate*/), abs(fft_res[i-start_samp])/100);
         }
         qDebug() << "-----------------------------------------------";
     }
 #endif
-    for(unsigned short i = 0; i < cuza.getSeriesCount(); i++)
-        m_chart->addSeries(m_lineseries[i]);
-    m_chart->createDefaultAxes();
-    m_chart->axisY()->setRange(-2048, 2048);
-    m_chart->legend()->markers()[Chart::SAMPS]->setLabel("Сигнал");
-    m_chart->legend()->markers()[Chart::ENV]->setLabel("Огибающая");
+    QString series_name[] = {"Сигнал", "Фаза", "Амплитудный спектр", "Огибающая"};
+    for(unsigned short i = 0; i < cuza.getChartCount(); i++){
+        m_charts[i]->addSeries(m_lineseries[i]);
+        m_charts[i]->createDefaultAxes();
+        m_charts[i]->legend()->markers()[0]->setLabel(series_name[i]);
+        if(i == Chart::chOSC){
+            m_charts[i]->addSeries(m_lineseries[i+3]);
+            m_charts[i]->legend()->markers()[1]->setLabel(series_name[i+3]);
+            m_charts[i]->createDefaultAxes();
+//            m_charts[i]->axisY()->setRange(-2048, 2048);
+        }
+    }
 }
 
 unsigned DataProcessor::getScale() const
@@ -281,12 +271,24 @@ void DataProcessor::hilbert(fftw_complex* in, fftw_complex* out, const unsigned 
 {
 #define FFT
 #ifdef FFT
+    auto assign_compl = [](fftw_complex& dest, fftw_complex& val, unsigned coef = 1)->void{
+        dest[REAL] = val[REAL]*coef;
+        dest[IMAG] = val[IMAG]*coef;
+    };
+    auto assign_compl_d = [](fftw_complex& dest, double val)->void{
+        dest[REAL] = val;
+        dest[IMAG] = val;
+    };
     fftw_complex in_scaled[N];
-    for(unsigned i = 1; i < N/2; i++){
-        in_scaled[i][REAL] = in[i][REAL] * 2;
-        in_scaled[i][IMAG] = in[i][IMAG] * 2;
+    unsigned half = round(N/2.);
+    assign_compl(in_scaled[0], in[0]);
+    assign_compl(in_scaled[0], in[0]);
+    for(unsigned i = 1; i < N; i++){
+        if(i < half)  assign_compl(in_scaled[i], in[i], 2);
+        else if (i > half) assign_compl_d(in_scaled[i], 0);
     }
-    memset(&in_scaled[N/2+1], 0, N/2-1);
+//    memset можно не использовать, т.к. при объявлении in_scaled in_scaled[i] == 0
+//    memset(&in_scaled[half+1], 0, (!(half%2) ? half : (half-1))*sizeof(fftw_complex));
     ifft(in_scaled, out, N);
 #else
     complex_ptr dft_ptr = dft(in, N);
@@ -297,19 +299,17 @@ void DataProcessor::hilbert(fftw_complex* in, fftw_complex* out, const unsigned 
 #endif
 }
 
-void DataProcessor::calc_fft_env(fftw_complex* fft_res, qint16* env, const unsigned start, const unsigned end)
+void DataProcessor::calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig, const unsigned start, const unsigned end)
 {
     Cuza& cuza = Cuza::get();
     const unsigned N = end-start+1;
-    fftw_complex in[N], out_hil[N];
+    fftw_complex in[N];
     for(unsigned i = start; i <= end; i++){
         in[i-start][REAL] = cuza.getSample(i);
         in[i-start][IMAG] = 0;
     }
     fft(in, fft_res, end-start+1);
-    hilbert(fft_res, out_hil, N);
-    for(unsigned i = 0; i < end-start+1; i++)
-        env[i] = abs(complex(out_hil[i][REAL], out_hil[i][IMAG]));
+    hilbert(fft_res, complex_sig, N);
 }
 
 void DataProcessor::setScale(const double& value)

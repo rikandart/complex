@@ -49,7 +49,7 @@ TRANSLATIONS += \
 INCLUDEPATH += \
     ./FFTW/ \
 
-LIBS += -L"C:/repos/complex/FFTW/" -llibfftw3-3
+LIBS += -L"C:/git/repositories/complex/FFTW/" -llibfftw3-3
 #QMAKE_CFLAGS += C:/repos/complex/FFTW/lib/libfftw3-3.def
 
 # Default rules for deployment.

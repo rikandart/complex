@@ -1,5 +1,6 @@
 #ifndef DATAPROCESSOR_H
 #define DATAPROCESSOR_H
+#define _USE_MATH_DEFINES
 
 #include <QFile>
 #include <QDataStream>
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <fftw3.h>
 #include "cuza.h"
+
 #define NCOUNT 100
 #define SWEEP_WINDOWS 5
 #define ENV_COEF 1000
@@ -46,7 +48,7 @@ public:
     // запоминает указатели на серию точек и самого графика
     // вызов без аргументов перерисовывает график
     // флаг prev для прорисовки предыдущего сигнала
-    void oscOutput(QLineSeries** &series, QChart* chart = nullptr, bool prev = false);
+    void oscOutput(QLineSeries** &series, QChart** charts = nullptr, bool prev = false);
     // расчет спектра
 //    QVector<float> getSpectrum();
 
@@ -59,7 +61,7 @@ private:
     unsigned win_i = 0, offset = 0;
     double scale = 1;
     QLineSeries** m_lineseries = nullptr;
-    QChart* m_chart = nullptr;
+    QChart** m_charts = nullptr;
     size_t bufLen = 0;
     unsigned fftN = 0;
     bool hilb = false;
@@ -74,9 +76,8 @@ private:
     complex_ptr inv_dft(const complex_ptr spectrum, const unsigned N);
     // преобразование гильберта для извлечения огибающей
     void hilbert(fftw_complex* in,  fftw_complex* out, const unsigned N);
-    // расчет бпф и огибающей
-    // fft_res - комплексный спектр, env - огибающая
-    void calc_fft_env(fftw_complex* fft_res, qint16* env, const unsigned start, const unsigned end);
+    // расчет бпф и комплексного сигнала
+    void calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig, const unsigned start, const unsigned end);
 public slots:
     void setScale (const double& value);
 };

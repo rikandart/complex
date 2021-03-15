@@ -29,6 +29,19 @@ enum SpectrumWindows {
   swExactBlackman // Окно Блэкмена.
 };
 
+enum Series {
+  SAMPS, // отсчеты
+  PHASE, // фаза
+  AMP,   // амплитудный спектр
+  ENV,   // огибающая
+};
+
+enum Chart {
+  chOSC,  // отсчеты и огибающая
+  chPHASE,// фазовый спектр
+  chAMP,  // амплитудный спектр
+};
+
 // синглтон для хранения мета данных из ini файла
 class Cuza : public QObject
 {
@@ -198,6 +211,8 @@ public:
 
     unsigned short getSeriesCount() const;
 
+    unsigned short getChartCount() const;
+
 private:
     explicit Cuza(QObject *parent = nullptr);
     ~Cuza();
@@ -274,7 +289,8 @@ private:
     // буфер отсчетов
     qint16*      sampbuffer;
     // кол-во серий выводимы в диаграмму (chart)
-    const unsigned short m_series_count = 4;
+    const unsigned short m_series_count = 4,
+                         m_chart_count = 3;
 
 signals:
 

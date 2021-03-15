@@ -133,9 +133,57 @@ QPointF ChartView::nearestNode(float x, float y)
     return m_chart->mapToPosition(point);
 }
 
+void ChartView::resetAll()
+{
+    if(!anchorY) {// даблклик центрирует график и сбрасывает зум
+        zoomcountX = 0;
+        zoomcountY = 0;
+        m_chart->zoomReset();
+        resetAxis(m_axisX);
+        resetAxis(m_axisY);
+    } else { // центрирование по высоте (shift + double click)
+        if (!(zoomedmaxY + zoomedminY)) return;
+        // флаг спуска или подъема графика
+        bool direction = abs(zoomedmaxY) > abs(zoomedminY);
+        while(direction ? (zoomedmaxY-zoomedminY) < 2*zoomedmaxY : (zoomedminY-zoomedmaxY) > 2*zoomedminY){
+            double coef = 0.0;
+            if(abs(zoomedmaxY+zoomedminY) > 2) coef = 1;
+            else{
+                coef = 0.01;
+                // если разница между величинами уже несущественна,
+                // то присваиваем минимальный противоположный максимальному и выходим из цикла
+                if(abs(2*zoomedmaxY - (zoomedmaxY-zoomedminY)) < 0.02) {
+                    zoomedminY = -zoomedmaxY;
+                    break;
+                }
+            }
+            if(!direction) coef = -coef;
+            zoomedmaxY -= coef;
+            zoomedminY -= coef;
+        }
+        m_axisY->setMax(zoomedmaxY);
+        m_axisY->setMin(zoomedminY);
+        getZoomedAxes();
+    }
+    buildGrid();
+}
+
 void ChartView::checkGrid()
 {
     buildGrid();
+}
+
+void ChartView::receiveDelta(int dx, int dy, int curx, int cury)
+{
+//    qDebug() << "receiveDelta";
+    if(!(dx || dy || curx || cury)){
+        resetAll();
+    } else{
+        m_chart->scroll(-dx, dy);
+        oldx = curx;
+        oldy = cury;
+        buildGrid();
+    }
 }
 
 void ChartView::wheelEvent(QWheelEvent *event)
@@ -195,6 +243,7 @@ void ChartView::wheelEvent(QWheelEvent *event)
             }
         }
     };
+    qDebug() << "anchorX" << anchorX << "anchorY" << anchorY;
     if(area.contains(QPoint(event->x(), event->y()))){
             QPointF areacenter = area.center();
             qreal coef = ang_data.y() > 0 ? 1.0/ZoomCoef : ZoomCoef;
@@ -240,38 +289,8 @@ void ChartView::mousePressEvent(QMouseEvent *event)
 
 void ChartView::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    if(!anchorY) {// даблклик центрирует график и сбрасывает зум
-        zoomcountX = 0;
-        zoomcountY = 0;
-        m_chart->zoomReset();
-        resetAxis(m_axisX);
-        resetAxis(m_axisY);
-    } else { // центрирование по высоте (shift + double click)
-        if (!(zoomedmaxY + zoomedminY)) return;
-        // флаг спуска или подъема графика
-        bool direction = abs(zoomedmaxY) > abs(zoomedminY);
-        while(direction ? (zoomedmaxY-zoomedminY) < 2*zoomedmaxY : (zoomedminY-zoomedmaxY) > 2*zoomedminY){
-            double coef = 0.0;
-            if(abs(zoomedmaxY+zoomedminY) > 2) coef = 1;
-            else{
-                coef = 0.01;
-                // если разница между величинами уже несущественна,
-                // то присваиваем минимальный противоположный максимальному и выходим из цикла
-                if(abs(2*zoomedmaxY - (zoomedmaxY-zoomedminY)) < 0.02) {
-                    zoomedminY = -zoomedmaxY;
-                    break;
-                }
-            }
-            if(!direction) coef = -coef;
-            zoomedmaxY -= coef;
-            zoomedminY -= coef;
-        }
-        m_axisY->setMax(zoomedmaxY);
-        m_axisY->setMin(zoomedminY);
-        getZoomedAxes();
-    }
-    buildGrid();
-    // emit doubleClicked();
+    resetAll();
+    emit transmitDelta();
 }
 
 void ChartView::mouseReleaseEvent(QMouseEvent *event)
@@ -283,6 +302,7 @@ void ChartView::mouseReleaseEvent(QMouseEvent *event)
 
 void ChartView::mouseMoveEvent(QMouseEvent *event)
 {
+    this->setFocus();
     m_mousePos = event->pos();
     this->scene()->invalidate(this->sceneRect());
     if(chartmoving){
@@ -309,6 +329,8 @@ void ChartView::mouseMoveEvent(QMouseEvent *event)
         oldx = curx;
         oldy = cury;
         buildGrid();
+        emit transmitDelta(dX, dY, curx, cury);
+//        qDebug() << "after transmit";
     }
 }
 

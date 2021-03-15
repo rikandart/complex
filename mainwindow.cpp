@@ -16,22 +16,20 @@ MainWindow::MainWindow(QWidget *parent)
     ui->fileTree->setModel(m_qfsm);
     ui->fileTree->setSortingEnabled(false);
     m_stim = new QStandardItemModel(0, 4, this);
-    m_stim->setHeaderData(0, Qt::Horizontal, "Имя");
-    m_stim->setHeaderData(1, Qt::Horizontal, "Размер");
-    m_stim->setHeaderData(2, Qt::Horizontal, "Тип");
-    m_stim->setHeaderData(3, Qt::Horizontal, "Дата изменения");
+    QString headers[4] = {"Имя", "Размер", "Тип", "Дата изменения"};
+    for(unsigned i = 0; i < 4; i++) m_stim->setHeaderData(i, Qt::Horizontal, headers[i]);
     ui->fileTree->header()->setModel(m_stim);
     ui->fileTree->header()->resizeSection(0, 445);
     m_dataPr = new DataProcessor;
     m_series = new QLineSeries*[Cuza::get().getSeriesCount()];
+    m_charts = new QChart*[Cuza::get().getSeriesCount()];
+    m_chViews = new ChartView*[Cuza::get().getSeriesCount()];
     graphTabInit();
     QTimer::singleShot(0, this, SLOT(appReady()));
-    /*splitter = new QSplitter(this->centralWidget());
-    splitter->setOrientation(Qt::Horizontal);
+    /*
+    splitter->setOrientation();
     // set position for splitter
-    this->setCentralWidget(splitter);
-    splitter->setStretchFactor(0,1);
-    splitter->setStretchFactor(1,1);*/
+    this->setCentralWidget(splitter);*/
 #ifndef QT_DEBUG
     setPath(m_qfsm->myComputer().toString());
 #else
@@ -44,16 +42,17 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    //delete splitter;
     delete m_stim;
     delete m_qfsm;
     /*delete m_graphView;
     delete m_graphScene;*/
-    m_chart->removeAllSeries();
+    for(unsigned i = 0; i < Cuza::get().getChartCount(); i++)
+        m_charts[i]->removeAllSeries();
 //    const unsigned short ser_count = Cuza::get().getSeriesCount();
 //    for(unsigned i = 0; i < ser_count; i++) delete m_series[i];
     delete[] m_series;
-    delete m_chart;
+    delete[] m_charts;
+    delete splitter;
     delete ui;
 }
 
@@ -67,13 +66,15 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 {
     static bool frst = true;
     if(frst){
-        m_chartView->resize(this->width()-24, this->height()-85);
+        splitter->move(-3,0);
+//        qDebug() << ui->tab_2->pos() << splitter->pos();
+        splitter->resize(this->width()-24, this->height()-85);
         // m_graphView->resize(this->width()-24, this->height()-85);
         frst = false;
     } else{
         QSize delta = ui->tabWidget->size() - oldSize;
         oldSize = ui->tabWidget->size();
-        m_chartView->resize(m_chartView->size()+delta);
+        splitter->resize(splitter->size()+delta);
         emit rebuildGrid();
         //m_graphView->resize(m_graphView->size()+delta);
         //if(!m_graphScene->items().isEmpty()) m_dataPr->dispOutput();
@@ -82,16 +83,19 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 
 void MainWindow::graphTabInit()
 {
-    ui->tab_2->setSizePolicy(ui->tabWidget->sizePolicy());
-    m_chart = new QChart;
-    m_chartView = new ChartView(m_chart, ui->tab_2);
-    /*ui->tab_2->grabGesture(Qt::PanGesture);
-    ui->tab_2->grabGesture(Qt::PinchGesture);*/
-    m_chart->setTitle("Осциллограмма");
-    QObject::connect(m_chartView, &ChartView::arrowPressed,
-                     this, &MainWindow::redrawOsc);
-    QObject::connect(this, &MainWindow::rebuildGrid,
-                     m_chartView, &ChartView::checkGrid);
+    splitter = new QSplitter(Qt::Vertical, ui->tab_2);
+    for(unsigned i = 0; i < Cuza::get().getChartCount(); i++){
+        m_chViews[i] = new ChartView((m_charts[i] = new QChart));
+        splitter->addWidget(m_chViews[i]);
+        QObject::connect(m_chViews[i], &ChartView::arrowPressed,
+                         this, &MainWindow::redrawOsc);
+        QObject::connect(this, &MainWindow::rebuildGrid,
+                         m_chViews[i], &ChartView::checkGrid);
+    }
+    QObject::connect(m_chViews[Chart::chOSC], &ChartView::transmitDelta,
+                     m_chViews[Chart::chPHASE], &ChartView::receiveDelta);
+    QObject::connect(m_chViews[Chart::chPHASE], &ChartView::transmitDelta,
+                     m_chViews[Chart::chOSC], &ChartView::receiveDelta);
     // graphview
     // is used for db
     /*m_graphView = new GraphView(ui->tab_3);
@@ -110,10 +114,12 @@ void MainWindow::appReady()
 void MainWindow::redrawOsc(Qt::Key key)
 {
     auto redraw = [&](bool prev = false)->void{
-        m_dataPr->oscOutput(m_series, m_chart, prev);
-        m_chartView->setUpdatesEnabled(true);
-        m_chartView->setAxisAndRange(static_cast<QValueAxis*>(m_chart->axisX()),
-                                     static_cast<QValueAxis*>(m_chart->axisY()));
+        m_dataPr->oscOutput(m_series, m_charts, prev);
+        for(unsigned i = 0; i < Cuza::get().getChartCount(); i++){
+            m_chViews[i]->setUpdatesEnabled(true);
+            m_chViews[i]->setAxisAndRange(static_cast<QValueAxis*>(m_charts[i]->axisX()),
+                                         static_cast<QValueAxis*>(m_charts[i]->axisY()));
+        }
     };
     switch(key){
         case Qt::Key_Right:
@@ -140,11 +146,12 @@ void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
         if(INIProcessor().read(m_qfsm->filePath(index).
            replace(".dat", ".ini", Qt::CaseInsensitive))){
             m_dataPr->Read(m_qfsm->filePath(index));
-            m_dataPr->oscOutput(m_series, m_chart);
+            m_dataPr->oscOutput(m_series, m_charts);
             ui->tabWidget->setCurrentWidget(ui->tab_2);
-            m_chartView->setAxisAndRange(static_cast<QValueAxis*>(m_chart->axisX()),
-                                         static_cast<QValueAxis*>(m_chart->axisY()));
-            m_chartView->setFocus();
+            for(unsigned i = 0; i < Cuza::get().getChartCount(); i++)
+                m_chViews[i]->setAxisAndRange(static_cast<QValueAxis*>(m_charts[i]->axisX()),
+                                         static_cast<QValueAxis*>(m_charts[i]->axisY()));
+            m_chViews[Chart::chOSC]->setFocus();
         }
     }
 

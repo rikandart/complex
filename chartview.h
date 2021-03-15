@@ -62,9 +62,12 @@ private:
     bool    chartmoving = false;
     bool    anchorX = false, anchorY = false,
             xmoving = false, ymoving = false;
+    void resetAll();
 signals:
     void arrowPressed(Qt::Key);
+    void transmitDelta(int dx = 0, int dy = 0, int curx = 0, int cury = 0);
 public slots:
     void checkGrid();
+    void receiveDelta(int dx = 0, int dy = 0, int curx = 0, int cury = 0);
 };
 #endif // CHARTVIEW_H

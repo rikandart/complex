@@ -13,6 +13,11 @@ Cuza::~Cuza()
     if(mainbuffer)  delete[] mainbuffer;
 }
 
+unsigned short Cuza::getChartCount() const
+{
+    return m_chart_count;
+}
+
 unsigned short Cuza::getSeriesCount() const
 {
     return m_series_count;
@@ -28,12 +33,8 @@ void Cuza::retriveWinTime()
     winTime = 0;
     for(unsigned i = 16; i < 64; i++){
         winTime = (winTime << 1)|((mainbuffer[i*2+1] >> 7) & 1);
-        if (i == 16)
-            qDebug() << ((mainbuffer[i*2+1] >> 7) & 1);
     }
-    qDebug() << "winTime" << winTime << QString::number(winTime, 2);
     // winTime /= fd;
-    qDebug() << "winTime/fd" << winTime/fd << QString::number(winTime, 2);
 }
 
 void Cuza::cleanMainBuffer()
@@ -112,13 +113,10 @@ void Cuza::retrieveSync()
 {
     // в 7м бите каждого второго байта первых 16ти слов
     // содержится бит синхроимпульса
-    qDebug() << "-------------";
     sync = 0;
-    qDebug() << "sync before" << QString::number(sync, 2) << QString::number(sync, 2).length();
     for(unsigned i = 0; i < 16; i++){
         sync = (sync << 1)|((mainbuffer[i*2+1] >> 7) & 1);
     }
-    qDebug() << "sync after" << QString::number(sync, 2) << QString::number(sync, 2).length();
 }
 
 Cuza::operator QString() const
@@ -451,7 +449,6 @@ void Cuza::setSampWinLen(const unsigned &value)
 {
     sampWinLen = value; 
     sampWinLen /= 2;
-    qDebug() << "sampWinLen in" << value << "sampWinLen out" << sampWinLen;
 }
 
 unsigned Cuza::getDecimationRatio() const

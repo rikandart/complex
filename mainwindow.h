@@ -45,8 +45,9 @@ private:
     QStandardItemModel *m_stim;
     GraphView * m_graphView;
     QGraphicsScene * m_graphScene;
-    ChartView* m_chartView;
-    QChart* m_chart;
+    // виджеты графиков осциллограммы и огибающей, фазы и спектра
+    ChartView** m_chViews;
+    QChart** m_charts;
     QLineSeries** m_series;
     QSplitter* splitter;
     DataProcessor* m_dataPr;
