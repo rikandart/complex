@@ -44,7 +44,7 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
         (m_lineseries[i] = new QLineSeries)->clear();
 
     // поиск сигнала по порогу
-    const unsigned  sampling_rate = cuza.getFd(), nfft = cuza.getNFFT(),
+    const unsigned  sampling_rate = cuza.getFd(), spec_points = cuza.getSpectrumPoints(),
                     maxsamp = cuza.getMaxVisSamples(),
                     bufsize = cuza.getBufferSize();
     static unsigned prev_offset = offset;
@@ -196,8 +196,8 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
             m_lineseries[Series::PHASE]->append((i-start_samp)*(1.0/sampling_rate),arg(complex_sig[i-start_samp]));
             if(i-start_samp <= (end_samp-start_samp+1)/2){
                 if(i != start_samp)
-                    m_lineseries[Series::AMP]->append((i-start_samp)*sampling_rate/(double)nfft, abs(fft_res[i-start_samp-1]));
-                m_lineseries[Series::AMP]->append((i-start_samp)*sampling_rate/(double)nfft, abs(fft_res[i-start_samp]));
+                    m_lineseries[Series::AMP]->append(sampling_rate-(i-start_samp)*sampling_rate/(double)spec_points, abs(fft_res[i-start_samp-1]));
+                m_lineseries[Series::AMP]->append(sampling_rate-(i-start_samp)*sampling_rate/(double)spec_points, abs(fft_res[i-start_samp]));
                 qDebug() << "amplitude_spectrum" << "sampling rate" << sampling_rate << "(i-start_samp)*sampling_rate" << (i-start_samp)*sampling_rate;
             }
         }
