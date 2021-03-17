@@ -44,7 +44,7 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
         (m_lineseries[i] = new QLineSeries)->clear();
 
     // поиск сигнала по порогу
-    const unsigned  sampling_rate = cuza.getFd(),
+    const unsigned  sampling_rate = cuza.getFd(), nfft = cuza.getNFFT(),
                     maxsamp = cuza.getMaxVisSamples(),
                     bufsize = cuza.getBufferSize();
     static unsigned prev_offset = offset;
@@ -130,7 +130,9 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
                         }
                     }
                 }
-                m_lineseries[Series::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
+                // в мВ
+                m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), cuza.getSample(offset-1)/2.048);
+                m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), samp/2.048);
             }
         } else {
                 for(auto [start, thrsh_cou] = std::make_tuple(false, 0);
@@ -170,10 +172,12 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
                             }
                         }
                     }
-                    m_lineseries[Series::SAMPS]->append(offset/**(1.0/sampling_rate)*/, samp);
+                    // в мВ
+                    m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), cuza.getSample(offset-1)/2.048);
+                    m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), samp/2.048);
                 }
             }
-        // преобразование гильберта
+        // вычисление квадратуры и бпф
         const unsigned start_samp = !prev ? start_offset : offset,
                 end_samp = !prev ? offset : start_offset,
                 size = end_samp-start_samp+1;
@@ -186,9 +190,16 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
             return atan(fft_samp[IMAG]/fft_samp[REAL])*180/M_PI;
         };
         for(unsigned i = start_samp; i <= end_samp; i++){
-            m_lineseries[Series::ENV]->append(i/**(1.0/sampling_rate)*/, abs(complex_sig[i-start_samp]));
-            m_lineseries[Series::PHASE]->append(i*(1.0/*/sampling_rate*/),arg(complex_sig[i-start_samp]));
-            m_lineseries[Series::AMP]->append(i*(1.0/*/sampling_rate*/), abs(fft_res[i-start_samp])/100);
+            if(i != start_samp)
+                m_lineseries[Series::ENV]->append((i-start_samp)*(1.0/sampling_rate), abs(complex_sig[i-start_samp-1]));
+            m_lineseries[Series::ENV]->append((i-start_samp)*(1.0/sampling_rate), abs(complex_sig[i-start_samp]));
+            m_lineseries[Series::PHASE]->append((i-start_samp)*(1.0/sampling_rate),arg(complex_sig[i-start_samp]));
+            if(i-start_samp <= (end_samp-start_samp+1)/2){
+                if(i != start_samp)
+                    m_lineseries[Series::AMP]->append((i-start_samp)*sampling_rate/(double)nfft, abs(fft_res[i-start_samp-1]));
+                m_lineseries[Series::AMP]->append((i-start_samp)*sampling_rate/(double)nfft, abs(fft_res[i-start_samp]));
+                qDebug() << "amplitude_spectrum" << "sampling rate" << sampling_rate << "(i-start_samp)*sampling_rate" << (i-start_samp)*sampling_rate;
+            }
         }
         qDebug() << "-----------------------------------------------";
     }
@@ -205,6 +216,13 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
 //            m_charts[i]->axisY()->setRange(-2048, 2048);
         }
     }
+    // axes()[0] - x axis, axes()[1] - y
+    double osc_center = [](const QValueAxis* axis)->double{
+        return (axis->max()-axis->min())/2.0;
+    }((QValueAxis*)m_charts[Chart::chOSC]->axes()[1]);
+    m_charts[Chart::chOSC]->axes()[1]->setRange(-osc_center, osc_center);
+    m_charts[Chart::chPHASE]->axes()[1]->setRange(-90,90);
+    m_charts[Chart::chAMP]->axes()[1]->setMin(0);
 }
 
 unsigned DataProcessor::getScale() const
@@ -305,7 +323,7 @@ void DataProcessor::calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* compl
     const unsigned N = end-start+1;
     fftw_complex in[N];
     for(unsigned i = start; i <= end; i++){
-        in[i-start][REAL] = cuza.getSample(i);
+        in[i-start][REAL] = cuza.getSample(i)/2.048;
         in[i-start][IMAG] = 0;
     }
     fft(in, fft_res, end-start+1);

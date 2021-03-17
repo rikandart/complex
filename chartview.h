@@ -21,11 +21,15 @@ class ChartView : public QChartView
     Q_OBJECT
 public:
     ChartView(QWidget *parent = nullptr);
-    ChartView(QChart* chart, QWidget *parent = nullptr);
+    ChartView(QChart* chart, Chart type, QWidget *parent = nullptr);
     void setAxisAndRange(QValueAxis *axisX, QValueAxis *axisY);
 private:
     enum Axis{
       x, y
+    };
+    enum InputEvent{
+      MWHEEL, MPRESS, MDOUBLECLICK, MRELEASE, MMOVE,
+      KPRESS, KRELEASE
     };
     virtual void wheelEvent(QWheelEvent *event);
     virtual void mousePressEvent(QMouseEvent *event);
@@ -35,17 +39,21 @@ private:
     virtual void keyPressEvent(QKeyEvent *event);
     virtual void keyReleaseEvent(QKeyEvent *event);
     virtual void drawForeground(QPainter* painter, const QRectF& rect);
+    void drawAxesLabels(QPainter* painter);
 //    virtual void paintEvent(QPaintEvent *event);
     void resetAxis(QValueAxis* axis);
     void resetZoomedAxis(QValueAxis* axis);
     void getZoomedAxes();
     void drawCross(const QPointF point);
     void buildGrid();
+    // центрирование графика
+    void centerVertically();
     QPointF nearestNode(float x, float y);
     QPoint m_mousePos;
     QChart* m_chart = nullptr;
     QValueAxis* m_axisX = nullptr, *m_axisY = nullptr;
     QPainter* m_painter;
+    Chart chartType;
     int     oldx = 0, oldy = 0,
             frstx = 0, frsty = 0;
     // сетка, первые GRIDCOUNT значений - сетка икса
@@ -62,12 +70,16 @@ private:
     bool    chartmoving = false;
     bool    anchorX = false, anchorY = false,
             xmoving = false, ymoving = false;
-    void resetAll();
+    // используется для согласованности осциллограммы и графика фазы
+    // receiving - флаг прием qt сигнала через receiveEvent
+    // receive_redraw - не перерисовывает подсказку, если принимает qt сигнал
+    bool    receiving = false, receive_redraw = false,
+            mouse_press_event = false;
 signals:
     void arrowPressed(Qt::Key);
-    void transmitDelta(int dx = 0, int dy = 0, int curx = 0, int cury = 0);
+    void transmitEvent(InputEvent type, QInputEvent* event);
 public slots:
     void checkGrid();
-    void receiveDelta(int dx = 0, int dy = 0, int curx = 0, int cury = 0);
+    void receiveEvent(InputEvent type, QInputEvent* event);
 };
 #endif // CHARTVIEW_H

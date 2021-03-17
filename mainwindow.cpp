@@ -85,17 +85,17 @@ void MainWindow::graphTabInit()
 {
     splitter = new QSplitter(Qt::Vertical, ui->tab_2);
     for(unsigned i = 0; i < Cuza::get().getChartCount(); i++){
-        m_chViews[i] = new ChartView((m_charts[i] = new QChart));
+        m_chViews[i] = new ChartView((m_charts[i] = new QChart), Chart(i));
         splitter->addWidget(m_chViews[i]);
         QObject::connect(m_chViews[i], &ChartView::arrowPressed,
                          this, &MainWindow::redrawOsc);
         QObject::connect(this, &MainWindow::rebuildGrid,
                          m_chViews[i], &ChartView::checkGrid);
     }
-    QObject::connect(m_chViews[Chart::chOSC], &ChartView::transmitDelta,
-                     m_chViews[Chart::chPHASE], &ChartView::receiveDelta);
-    QObject::connect(m_chViews[Chart::chPHASE], &ChartView::transmitDelta,
-                     m_chViews[Chart::chOSC], &ChartView::receiveDelta);
+    QObject::connect(m_chViews[Chart::chOSC], &ChartView::transmitEvent,
+                     m_chViews[Chart::chPHASE], &ChartView::receiveEvent);
+    QObject::connect(m_chViews[Chart::chPHASE], &ChartView::transmitEvent,
+                     m_chViews[Chart::chOSC], &ChartView::receiveEvent);
     // graphview
     // is used for db
     /*m_graphView = new GraphView(ui->tab_3);
@@ -117,8 +117,8 @@ void MainWindow::redrawOsc(Qt::Key key)
         m_dataPr->oscOutput(m_series, m_charts, prev);
         for(unsigned i = 0; i < Cuza::get().getChartCount(); i++){
             m_chViews[i]->setUpdatesEnabled(true);
-            m_chViews[i]->setAxisAndRange(static_cast<QValueAxis*>(m_charts[i]->axisX()),
-                                         static_cast<QValueAxis*>(m_charts[i]->axisY()));
+            m_chViews[i]->setAxisAndRange(static_cast<QValueAxis*>(m_charts[i]->axes()[0]),
+                                         static_cast<QValueAxis*>(m_charts[i]->axes()[1]));
         }
     };
     switch(key){

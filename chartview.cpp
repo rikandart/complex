@@ -8,13 +8,14 @@ ChartView::ChartView(QWidget *parent): QChartView(parent)
     this->setFocus();
 }
 
-ChartView::ChartView(QChart* chart, QWidget *parent): QChartView(chart, parent)
+ChartView::ChartView(QChart* chart, Chart type, QWidget *parent): QChartView(chart, parent), chartType(type)
 {
     m_chart = chart;
     this->setRubberBand(QChartView::RectangleRubberBand);
     this->setCursor(Qt::OpenHandCursor);
     this->setFocus();
     this->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
+    this->setRubberBand(QChartView::RectangleRubberBand);
 }
 
 void ChartView::setAxisAndRange(QValueAxis *axisX, QValueAxis *axisY)
@@ -95,6 +96,40 @@ void ChartView::buildGrid()
     }
 }
 
+void ChartView::centerVertically()
+{
+    if (!(zoomedmaxY + zoomedminY)) return;
+    // в случае с графиком амплитудного спектра спукаем его вниз на 0
+    if(chartType == Chart::chAMP){
+        ((QValueAxis*)(m_chart->axes()[1]))->setMax(
+                    ((QValueAxis*)(m_chart->axes()[1]))->max() -
+                    ((QValueAxis*)(m_chart->axes()[1]))->min());
+        ((QValueAxis*)(m_chart->axes()[1]))->setMin(0);
+        return;
+    }
+    // флаг спуска или подъема графика
+    bool direction = abs(zoomedmaxY) > abs(zoomedminY);
+    while(direction ? (zoomedmaxY-zoomedminY) < 2*zoomedmaxY : (zoomedminY-zoomedmaxY) > 2*zoomedminY){
+        double coef = 0.0;
+        if(abs(zoomedmaxY+zoomedminY) > 2) coef = 1;
+        else{
+            coef = 0.01;
+            // если разница между величинами уже несущественна,
+            // то присваиваем минимальный противоположный максимальному и выходим из цикла
+            if(abs(2*zoomedmaxY - (zoomedmaxY-zoomedminY)) < 0.02) {
+                zoomedminY = -zoomedmaxY;
+                break;
+            }
+        }
+        if(!direction) coef = -coef;
+        zoomedmaxY -= coef;
+        zoomedminY -= coef;
+    }
+    m_axisY->setMax(zoomedmaxY);
+    m_axisY->setMin(zoomedminY);
+    getZoomedAxes();
+}
+
 // поиск ближайшей точки к позиции мышки
 QPointF ChartView::nearestNode(float x, float y)
 {
@@ -133,57 +168,39 @@ QPointF ChartView::nearestNode(float x, float y)
     return m_chart->mapToPosition(point);
 }
 
-void ChartView::resetAll()
-{
-    if(!anchorY) {// даблклик центрирует график и сбрасывает зум
-        zoomcountX = 0;
-        zoomcountY = 0;
-        m_chart->zoomReset();
-        resetAxis(m_axisX);
-        resetAxis(m_axisY);
-    } else { // центрирование по высоте (shift + double click)
-        if (!(zoomedmaxY + zoomedminY)) return;
-        // флаг спуска или подъема графика
-        bool direction = abs(zoomedmaxY) > abs(zoomedminY);
-        while(direction ? (zoomedmaxY-zoomedminY) < 2*zoomedmaxY : (zoomedminY-zoomedmaxY) > 2*zoomedminY){
-            double coef = 0.0;
-            if(abs(zoomedmaxY+zoomedminY) > 2) coef = 1;
-            else{
-                coef = 0.01;
-                // если разница между величинами уже несущественна,
-                // то присваиваем минимальный противоположный максимальному и выходим из цикла
-                if(abs(2*zoomedmaxY - (zoomedmaxY-zoomedminY)) < 0.02) {
-                    zoomedminY = -zoomedmaxY;
-                    break;
-                }
-            }
-            if(!direction) coef = -coef;
-            zoomedmaxY -= coef;
-            zoomedminY -= coef;
-        }
-        m_axisY->setMax(zoomedmaxY);
-        m_axisY->setMin(zoomedminY);
-        getZoomedAxes();
-    }
-    buildGrid();
-}
-
 void ChartView::checkGrid()
 {
     buildGrid();
 }
 
-void ChartView::receiveDelta(int dx, int dy, int curx, int cury)
+void ChartView::receiveEvent(InputEvent type, QInputEvent* event)
 {
-//    qDebug() << "receiveDelta";
-    if(!(dx || dy || curx || cury)){
-        resetAll();
-    } else{
-        m_chart->scroll(-dx, dy);
-        oldx = curx;
-        oldy = cury;
-        buildGrid();
+    Q_ASSERT(event != nullptr);
+    receiving = receive_redraw = true;
+    switch (type) {
+    case InputEvent::MWHEEL:
+        this->wheelEvent(static_cast<QWheelEvent*>(event));
+        break;
+    case InputEvent::MPRESS:
+        this->mousePressEvent(static_cast<QMouseEvent*>(event));
+        break;
+    case InputEvent::MDOUBLECLICK:
+        this->mouseDoubleClickEvent(static_cast<QMouseEvent*>(event));
+        break;
+    case InputEvent::MRELEASE:
+        this->mouseReleaseEvent(static_cast<QMouseEvent*>(event));
+        break;
+    case InputEvent::MMOVE:
+        this->mouseMoveEvent(static_cast<QMouseEvent*>(event));
+        break;
+    case InputEvent::KPRESS:
+        this->keyPressEvent(static_cast<QKeyEvent*>(event));
+        break;
+    case InputEvent::KRELEASE:
+        this->keyReleaseEvent(static_cast<QKeyEvent*>(event));
+        break;
     }
+    receiving = false;
 }
 
 void ChartView::wheelEvent(QWheelEvent *event)
@@ -243,7 +260,6 @@ void ChartView::wheelEvent(QWheelEvent *event)
             }
         }
     };
-    qDebug() << "anchorX" << anchorX << "anchorY" << anchorY;
     if(area.contains(QPoint(event->x(), event->y()))){
             QPointF areacenter = area.center();
             qreal coef = ang_data.y() > 0 ? 1.0/ZoomCoef : ZoomCoef;
@@ -263,11 +279,14 @@ void ChartView::wheelEvent(QWheelEvent *event)
             }
             m_chart->zoomIn(area);
             // перемещение курсора
-            areacenter = m_chart->plotArea().center();
-            QCursor::setPos(this->mapToGlobal(QPoint(areacenter.x(), areacenter.y())));
+            if(!receiving) {
+                areacenter = m_chart->plotArea().center();
+                QCursor::setPos(this->mapToGlobal(QPoint(areacenter.x(), areacenter.y())));
+            }
             buildGrid();
             getZoomedAxes();
     }
+    if(!receiving) emit transmitEvent(InputEvent::MWHEEL, event);
 }
 
 void ChartView::mousePressEvent(QMouseEvent *event)
@@ -277,32 +296,43 @@ void ChartView::mousePressEvent(QMouseEvent *event)
     oldy = event->y();
     switch(event->button()){
         case Qt::LeftButton:
-        // перемещение графика
+             // перемещение графика
              chartmoving = true;
+             if(receiving) mouse_press_event = true;
              this->setCursor(Qt::ClosedHandCursor);
         break;
         case Qt::RightButton:
         // сделать зум по выделенной области
         break;
     }
+    if(!receiving) emit transmitEvent(InputEvent::MPRESS, event);
 }
 
 void ChartView::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    resetAll();
-    emit transmitDelta();
+    if(!anchorY) {// даблклик центрирует график и сбрасывает зум
+        zoomcountX = 0;
+        zoomcountY = 0;
+        m_chart->zoomReset();
+        resetAxis(m_axisX);
+        resetAxis(m_axisY);
+    } else centerVertically(); // центрирование по высоте (shift + double click)
+    buildGrid();
+    if(!receiving) emit transmitEvent(InputEvent::MDOUBLECLICK, event);
 }
 
 void ChartView::mouseReleaseEvent(QMouseEvent *event)
 {
-    chartmoving = xmoving = ymoving = false;
+    chartmoving = xmoving = ymoving = mouse_press_event = false;
     this->setCursor(Qt::OpenHandCursor);
     getZoomedAxes();
+    // иначе будет продолжаться бесконечно
+    if(!receiving) emit transmitEvent(InputEvent::MRELEASE, event);
 }
 
 void ChartView::mouseMoveEvent(QMouseEvent *event)
 {
-    this->setFocus();
+    if(!receiving) this->setFocus();
     m_mousePos = event->pos();
     this->scene()->invalidate(this->sceneRect());
     if(chartmoving){
@@ -329,9 +359,8 @@ void ChartView::mouseMoveEvent(QMouseEvent *event)
         oldx = curx;
         oldy = cury;
         buildGrid();
-        emit transmitDelta(dX, dY, curx, cury);
-//        qDebug() << "after transmit";
     }
+    if(!receiving) emit transmitEvent(InputEvent::MMOVE, event);
 }
 
 void ChartView::keyPressEvent(QKeyEvent *event)
@@ -339,7 +368,8 @@ void ChartView::keyPressEvent(QKeyEvent *event)
     Qt::Key key = Qt::Key(event->key());
     if (key == Qt::Key_Control) anchorX = true;
     if (key == Qt::Key_Shift) anchorY = true;
-    if (key == Qt::Key_Right || Qt::Key_Left) emit arrowPressed(key);
+    if ((key == Qt::Key_Right || Qt::Key_Left) && !receiving) emit arrowPressed(key);
+    if(!receiving) emit transmitEvent(InputEvent::KPRESS, event);
 }
 
 void ChartView::keyReleaseEvent(QKeyEvent *event)
@@ -347,25 +377,41 @@ void ChartView::keyReleaseEvent(QKeyEvent *event)
     int key = event->key();
     if (key == Qt::Key_Control) anchorX = false;
     if (key == Qt::Key_Shift) anchorY = false;
+    if(!receiving) emit transmitEvent(InputEvent::KRELEASE, event);
 }
 
 void ChartView::drawForeground(QPainter *painter, const QRectF &rect)
 {
     QRectF area = m_chart->plotArea();
+    drawAxesLabels(painter);
     if(area.contains(m_mousePos)){
         QRectF hint (m_mousePos.x() - hintShift - hintWidth, m_mousePos.y() - hintShift - hintHeight,
                      hintWidth, hintHeight);
         QRectF hintBorder (m_mousePos.x() - hintShift - hintWidth - 1, m_mousePos.y() - hintShift - hintHeight-1,
                            hintWidth+1, hintHeight+1);
         painter->setPen(QPen(QColor(122, 130, 144), 1));
-        painter->drawLine(area.left(), m_mousePos.y(), area.right(), m_mousePos.y());
         painter->drawLine(m_mousePos.x(), area.top(), m_mousePos.x(), area.bottom());
-        painter->drawRect(hintBorder);
-        painter->fillRect(hint, QBrush(Qt::white));
-        QPointF value = m_chart->mapToValue(m_mousePos);
-        painter->setPen(QPen(Qt::black, 10));
-        // текст рисуется вверх от заданно точки расположения
-        painter->drawText(hint.topLeft() + QPointF(3, 12), "x: " + QString().sprintf("%4.4f",value.x()));
-        painter->drawText(hint.topLeft() + QPointF(3, 25), "y: " + QString().sprintf("%4.4f",value.y()));
+        if(!receive_redraw && !mouse_press_event){
+            painter->drawLine(area.left(), m_mousePos.y(), area.right(), m_mousePos.y());
+            painter->drawRect(hintBorder);
+            painter->fillRect(hint, QBrush(Qt::white));
+            QPointF value = m_chart->mapToValue(m_mousePos);
+            painter->setPen(QPen(Qt::black, 10));
+            // текст рисуется вверх от заданно точки расположения
+            painter->drawText(hint.topLeft() + QPointF(3, 12), "x: " + QString().sprintf("%4.4f",value.x()));
+            painter->drawText(hint.topLeft() + QPointF(3, 25), "y: " + QString().sprintf("%4.4f",value.y()));
+        }
+        receive_redraw = false;
     }
+}
+
+void ChartView::drawAxesLabels(QPainter *painter)
+{
+    QList<QString> axesLabels;
+    axesLabels  << "U, мВ"   << "t, мкс"
+                << "Ф, °"    << "t, мкс"
+                << "A, мВ∙мкс" << "f, МГц";
+    QRect wid_area = this->rect();
+    painter->drawText(QPointF(wid_area.left()+30, wid_area.top()+52), axesLabels[chartType*2]);
+    painter->drawText(QPointF(wid_area.right()/2, wid_area.bottom()-20), axesLabels[chartType*2+1]);
 }
