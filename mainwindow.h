@@ -40,16 +40,18 @@ private slots:
     void on_fileTree_doubleClicked(const QModelIndex &index);
 
 private:
+    // внешний и два сплиттера под временные и частотные характеристики
+    static const unsigned splitters_count = 3;
     Ui::MainWindow *ui;
     QFileSystemModel *m_qfsm;
     QStandardItemModel *m_stim;
     GraphView * m_graphView;
-    QGraphicsScene * m_graphScene;
+    QGraphicsScene* m_graphScene;
     // виджеты графиков осциллограммы и огибающей, фазы и спектра
     ChartView** m_chViews;
     QChart** m_charts;
     QLineSeries** m_series;
-    QSplitter* splitter;
+    QSplitter* m_splitter[splitters_count];
     DataProcessor* m_dataPr;
     QSize oldSize;
     void setPath(const QString& path);

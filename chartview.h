@@ -21,7 +21,7 @@ class ChartView : public QChartView
     Q_OBJECT
 public:
     ChartView(QWidget *parent = nullptr);
-    ChartView(QChart* chart, Chart type, QWidget *parent = nullptr);
+    ChartView(QChart* chart, ChartType type, QWidget *parent = nullptr);
     void setAxisAndRange(QValueAxis *axisX, QValueAxis *axisY);
 private:
     enum Axis{
@@ -53,7 +53,7 @@ private:
     QChart* m_chart = nullptr;
     QValueAxis* m_axisX = nullptr, *m_axisY = nullptr;
     QPainter* m_painter;
-    Chart chartType;
+    ChartType chartType;
     int     oldx = 0, oldy = 0,
             frstx = 0, frsty = 0;
     // сетка, первые GRIDCOUNT значений - сетка икса

@@ -46,13 +46,12 @@ MainWindow::~MainWindow()
     delete m_qfsm;
     /*delete m_graphView;
     delete m_graphScene;*/
-    for(unsigned i = 0; i < Cuza::get().getChartCount(); i++)
+    for(unsigned i = 0; i < Cuza::get().getChartCount(); i++){
         m_charts[i]->removeAllSeries();
-//    const unsigned short ser_count = Cuza::get().getSeriesCount();
-//    for(unsigned i = 0; i < ser_count; i++) delete m_series[i];
+        delete m_charts[i];
+    }
     delete[] m_series;
     delete[] m_charts;
-    delete splitter;
     delete ui;
 }
 
@@ -66,15 +65,14 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 {
     static bool frst = true;
     if(frst){
-        splitter->move(-3,0);
-//        qDebug() << ui->tab_2->pos() << splitter->pos();
-        splitter->resize(this->width()-24, this->height()-85);
+        m_splitter[0]->move(-3,0);
+        m_splitter[0]->resize(this->width()-24, this->height()-85);
         // m_graphView->resize(this->width()-24, this->height()-85);
         frst = false;
     } else{
         QSize delta = ui->tabWidget->size() - oldSize;
         oldSize = ui->tabWidget->size();
-        splitter->resize(splitter->size()+delta);
+        m_splitter[0]->resize(m_splitter[0]->size()+delta);
         emit rebuildGrid();
         //m_graphView->resize(m_graphView->size()+delta);
         //if(!m_graphScene->items().isEmpty()) m_dataPr->dispOutput();
@@ -83,19 +81,37 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 
 void MainWindow::graphTabInit()
 {
-    splitter = new QSplitter(Qt::Vertical, ui->tab_2);
+    m_splitter[0] = new QSplitter(Qt::Horizontal, ui->tab_2);
+    m_splitter[1] = new QSplitter(Qt::Vertical);
+    m_splitter[2] = new QSplitter(Qt::Vertical);
+    for(unsigned i = 1; i < splitters_count; i++)
+        m_splitter[0]->addWidget(m_splitter[i]);
     for(unsigned i = 0; i < Cuza::get().getChartCount(); i++){
-        m_chViews[i] = new ChartView((m_charts[i] = new QChart), Chart(i));
-        splitter->addWidget(m_chViews[i]);
+        if(i == ChartType::chOSC || i == ChartType::chPHASE /*|| Chart::chFREQ*/){
+            m_chViews[i] = new ChartView((m_charts[i] = new QChart), ChartType(i));
+            m_splitter[1]->addWidget(m_chViews[i]);
+        } else {
+            m_chViews[i] = new ChartView((m_charts[i] = new QChart), ChartType(i));
+            m_splitter[2]->addWidget(m_chViews[i]);
+        }
         QObject::connect(m_chViews[i], &ChartView::arrowPressed,
                          this, &MainWindow::redrawOsc);
         QObject::connect(this, &MainWindow::rebuildGrid,
                          m_chViews[i], &ChartView::checkGrid);
     }
-    QObject::connect(m_chViews[Chart::chOSC], &ChartView::transmitEvent,
-                     m_chViews[Chart::chPHASE], &ChartView::receiveEvent);
-    QObject::connect(m_chViews[Chart::chPHASE], &ChartView::transmitEvent,
-                     m_chViews[Chart::chOSC], &ChartView::receiveEvent);
+    QObject::connect(m_chViews[ChartType::chOSC], &ChartView::transmitEvent,
+                     m_chViews[ChartType::chPHASE], &ChartView::receiveEvent);
+
+    QObject::connect(m_chViews[ChartType::chPHASE], &ChartView::transmitEvent,
+                     m_chViews[ChartType::chOSC], &ChartView::receiveEvent);
+//    QObject::connect(m_chViews[Chart::chOSC], &ChartView::transmitEvent,
+//                     m_chViews[Chart::chFREQ], &ChartView::receiveEvent);
+//    QObject::connect(m_chViews[Chart::chPHASE], &ChartView::transmitEvent,
+//                     m_chViews[Chart::chFREQ], &ChartView::receiveEvent);
+//    QObject::connect(m_chViews[Chart::chFREQ], &ChartView::transmitEvent,
+//                     m_chViews[Chart::chPHASE], &ChartView::receiveEvent);
+//    QObject::connect(m_chViews[Chart::chFREQ], &ChartView::transmitEvent,
+//                     m_chViews[Chart::chOSC], &ChartView::receiveEvent);
     // graphview
     // is used for db
     /*m_graphView = new GraphView(ui->tab_3);
@@ -151,7 +167,7 @@ void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
             for(unsigned i = 0; i < Cuza::get().getChartCount(); i++)
                 m_chViews[i]->setAxisAndRange(static_cast<QValueAxis*>(m_charts[i]->axisX()),
                                          static_cast<QValueAxis*>(m_charts[i]->axisY()));
-            m_chViews[Chart::chOSC]->setFocus();
+            m_chViews[ChartType::chOSC]->setFocus();
         }
     }
 

@@ -8,11 +8,10 @@ ChartView::ChartView(QWidget *parent): QChartView(parent)
     this->setFocus();
 }
 
-ChartView::ChartView(QChart* chart, Chart type, QWidget *parent): QChartView(chart, parent), chartType(type)
+ChartView::ChartView(QChart* chart, ChartType type, QWidget *parent): QChartView(chart, parent), chartType(type)
 {
     m_chart = chart;
     this->setRubberBand(QChartView::RectangleRubberBand);
-    this->setCursor(Qt::OpenHandCursor);
     this->setFocus();
     this->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
     this->setRubberBand(QChartView::RectangleRubberBand);
@@ -100,7 +99,7 @@ void ChartView::centerVertically()
 {
     if (!(zoomedmaxY + zoomedminY)) return;
     // в случае с графиком амплитудного спектра спукаем его вниз на 0
-    if(chartType == Chart::chAMP){
+    if(chartType == ChartType::chAMP){
         ((QValueAxis*)(m_chart->axes()[1]))->setMax(
                     ((QValueAxis*)(m_chart->axes()[1]))->max() -
                     ((QValueAxis*)(m_chart->axes()[1]))->min());
@@ -334,8 +333,12 @@ void ChartView::mouseMoveEvent(QMouseEvent *event)
 {
     if(!receiving) this->setFocus();
     m_mousePos = event->pos();
+    bool contains = m_chart->plotArea().contains(m_mousePos);
+    if(contains) this->setCursor(Qt::OpenHandCursor);
+    else this->setCursor(Qt::ArrowCursor);
     this->scene()->invalidate(this->sceneRect());
-    if(chartmoving){
+    this->setCursor(Qt::OpenHandCursor);
+    if(chartmoving && contains){
         int curx = event->x(),
             cury = event->y();
         int dX = curx - oldx,
@@ -408,8 +411,9 @@ void ChartView::drawForeground(QPainter *painter, const QRectF &rect)
 void ChartView::drawAxesLabels(QPainter *painter)
 {
     QList<QString> axesLabels;
-    axesLabels  << "U, мВ"   << "t, мкс"
-                << "Ф, °"    << "t, мкс"
+    axesLabels  << "ПЧ, мВ"   << "t, мкс"
+                << "Ф, °"     << "t, мкс"
+//                << "F, МГц"   << "t, мкс"
                 << "A, мВ∙мкс" << "f, МГц";
     QRect wid_area = this->rect();
     painter->drawText(QPointF(wid_area.left()+30, wid_area.top()+52), axesLabels[chartType*2]);

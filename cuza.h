@@ -32,13 +32,15 @@ enum SpectrumWindows {
 enum Series {
   SAMPS, // отсчеты
   PHASE, // фаза
+//  FREQ,  // мгновенная частота
   AMP,   // амплитудный спектр
   ENV,   // огибающая
 };
 
-enum Chart {
+enum ChartType {
   chOSC,  // отсчеты и огибающая
   chPHASE,// фазовый спектр
+//  chFREQ, // мгновенная частота
   chAMP,  // амплитудный спектр
 };
 

@@ -68,16 +68,16 @@ private:
     // расчет прямого и обратного бпф и дпф
     // qint16_ptr - разделяемый указатель на отсчеты
     // spectrum - разделяемый указатель на спектр, N - размерность бпф или дпф
-    complex_ptr dft(const std::vector<complex>& in, const unsigned N);
+    void dft(fftw_complex *in, fftw_complex *out, const unsigned N);
+    void idft(fftw_complex *in, fftw_complex *out, const unsigned N);
     void fft(fftw_complex *in, fftw_complex *out, const unsigned N);
     void ifft(fftw_complex *in, fftw_complex *out, const unsigned N);
     complex_ptr fft_inside(const std::vector<complex*>& in, const unsigned N);
-    complex_ptr inv_fft(const complex_ptr spectrum, unsigned N);
-    complex_ptr inv_dft(const complex_ptr spectrum, const unsigned N);
     // преобразование гильберта для извлечения огибающей
     void hilbert(fftw_complex* in,  fftw_complex* out, const unsigned N);
     // расчет бпф и комплексного сигнала
-    void calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig, const unsigned start, const unsigned end);
+    void calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig,
+                           const unsigned start, const unsigned end, fftw_complex* input = nullptr);
 public slots:
     void setScale (const double& value);
 };

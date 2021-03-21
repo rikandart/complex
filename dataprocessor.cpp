@@ -44,9 +44,10 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
         (m_lineseries[i] = new QLineSeries)->clear();
 
     // поиск сигнала по порогу
-    const unsigned  sampling_rate = cuza.getFd(), spec_points = cuza.getSpectrumPoints(),
+    const unsigned  sampling_rate = cuza.getFd(),
                     maxsamp = cuza.getMaxVisSamples(),
                     bufsize = cuza.getBufferSize();
+    const double tuned_freq = cuza.getFreq();
     static unsigned prev_offset = offset;
     static bool next = false;
     // назначение сдвига в зависимости от направления движения по записи
@@ -131,8 +132,8 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
                     }
                 }
                 // в мВ
-                m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), cuza.getSample(offset-1)/2.048);
-                m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), samp/2.048);
+                m_lineseries[Series::SAMPS]->append((offset-start_offset)/**(1.0/sampling_rate)*/, cuza.getSample(offset-1)/2.048);
+                m_lineseries[Series::SAMPS]->append((offset-start_offset)/**(1.0/sampling_rate)*/, samp/2.048);
             }
         } else {
                 for(auto [start, thrsh_cou] = std::make_tuple(false, 0);
@@ -173,8 +174,8 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
                         }
                     }
                     // в мВ
-                    m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), cuza.getSample(offset-1)/2.048);
-                    m_lineseries[Series::SAMPS]->append((offset-start_offset)*(1.0/sampling_rate), samp/2.048);
+                    m_lineseries[Series::SAMPS]->append((start_offset-offset)/**(1.0/sampling_rate)*/, cuza.getSample(offset+1)/2.048);
+                    m_lineseries[Series::SAMPS]->append((start_offset-offset)/**(1.0/sampling_rate)*/, samp/2.048);
                 }
             }
         // вычисление квадратуры и бпф
@@ -189,40 +190,42 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
         auto arg = [](const fftw_complex& fft_samp)->double{
             return atan(fft_samp[IMAG]/fft_samp[REAL])*180/M_PI;
         };
-        for(unsigned i = start_samp; i <= end_samp; i++){
-            if(i != start_samp)
-                m_lineseries[Series::ENV]->append((i-start_samp)*(1.0/sampling_rate), abs(complex_sig[i-start_samp-1]));
-            m_lineseries[Series::ENV]->append((i-start_samp)*(1.0/sampling_rate), abs(complex_sig[i-start_samp]));
-            m_lineseries[Series::PHASE]->append((i-start_samp)*(1.0/sampling_rate),arg(complex_sig[i-start_samp]));
-            if(i-start_samp <= (end_samp-start_samp+1)/2){
-                if(i != start_samp)
-                    m_lineseries[Series::AMP]->append(sampling_rate-(i-start_samp)*sampling_rate/(double)spec_points, abs(fft_res[i-start_samp-1]));
-                m_lineseries[Series::AMP]->append(sampling_rate-(i-start_samp)*sampling_rate/(double)spec_points, abs(fft_res[i-start_samp]));
-                qDebug() << "amplitude_spectrum" << "sampling rate" << sampling_rate << "(i-start_samp)*sampling_rate" << (i-start_samp)*sampling_rate;
+        for(unsigned i = 0; i < size; i++){
+            if(i != 0)
+                m_lineseries[Series::ENV]->append(i/**(1.0/sampling_rate)*/, abs(complex_sig[i-1]));
+            m_lineseries[Series::ENV]->append(i/**(1.0/sampling_rate)*/, abs(complex_sig[i]));
+            m_lineseries[Series::PHASE]->append(i/**(1.0/sampling_rate)*/,arg(complex_sig[i]));
+//            if(i != start_samp)
+//                m_lineseries[Series::FREQ]->append(i/**(1.0/sampling_rate)*/,
+//                                                   (arg(complex_sig[i])-arg(complex_sig[i-1]))*sampling_rate);
+            if(i <= size/2){
+                if(i != 0)
+                    m_lineseries[Series::AMP]->append(tuned_freq - sampling_rate/2.0 + i*sampling_rate/(double)size, abs(fft_res[i-1]));
+                m_lineseries[Series::AMP]->append(tuned_freq - sampling_rate/2.0 + i*sampling_rate/(double)size, abs(fft_res[i]));
             }
         }
+        qDebug() << "tune_frequency" << tuned_freq;
         qDebug() << "-----------------------------------------------";
     }
-#endif
-    QString series_name[] = {"Сигнал", "Фаза", "Амплитудный спектр", "Огибающая"};
+    QString series_name[] = {"Сигнал", "Фаза", /*"Мгновенная частота",*/ "Амплитудный спектр", "Огибающая"};
     for(unsigned short i = 0; i < cuza.getChartCount(); i++){
         m_charts[i]->addSeries(m_lineseries[i]);
         m_charts[i]->createDefaultAxes();
         m_charts[i]->legend()->markers()[0]->setLabel(series_name[i]);
-        if(i == Chart::chOSC){
-            m_charts[i]->addSeries(m_lineseries[i+3]);
-            m_charts[i]->legend()->markers()[1]->setLabel(series_name[i+3]);
+        if(i == ChartType::chOSC){
+            m_charts[i]->addSeries(m_lineseries[i+cuza.getSeriesCount()-1]);
+            m_charts[i]->legend()->markers()[1]->setLabel(series_name[i+cuza.getSeriesCount()-1]);
             m_charts[i]->createDefaultAxes();
-//            m_charts[i]->axisY()->setRange(-2048, 2048);
         }
     }
+#endif
     // axes()[0] - x axis, axes()[1] - y
     double osc_center = [](const QValueAxis* axis)->double{
         return (axis->max()-axis->min())/2.0;
-    }((QValueAxis*)m_charts[Chart::chOSC]->axes()[1]);
-    m_charts[Chart::chOSC]->axes()[1]->setRange(-osc_center, osc_center);
-    m_charts[Chart::chPHASE]->axes()[1]->setRange(-90,90);
-    m_charts[Chart::chAMP]->axes()[1]->setMin(0);
+    }((QValueAxis*)m_charts[ChartType::chOSC]->axes()[1]);
+    m_charts[ChartType::chOSC]->axes()[1]->setRange(-osc_center, osc_center);
+    m_charts[ChartType::chPHASE]->axes()[1]->setRange(-90,90);
+    m_charts[ChartType::chAMP]->axes()[1]->setMin(0);
 }
 
 unsigned DataProcessor::getScale() const
@@ -236,15 +239,16 @@ void DataProcessor::resizeCheck(const unsigned len, const unsigned width)
         scale = width/(double)(len);
 }
 
-complex_ptr DataProcessor::dft(const std::vector<complex>& in, const unsigned N)
+void DataProcessor::dft(fftw_complex *in, fftw_complex *out, const unsigned N)
 {
-    complex *dft_ptr = new complex[N];
-    for(unsigned i = 0; i < N; i++)
+    for(unsigned i = 0; i < N; i++){
+        out[i][REAL] = out[i][IMAG] = 0;
         for(unsigned j = 0; j < N; j++){
             double arg = 2*M_PI*j*i/(double)N;
-            dft_ptr[i] += in[j]*cos(arg), -in[j]*sin(arg);
+            out[i][REAL] += in[j][REAL]*cos(arg);
+            out[i][IMAG] += -in[j][REAL]*sin(arg);
         }
-    return complex_ptr(dft_ptr);
+    }
 }
 
 void DataProcessor::fft(fftw_complex *in, fftw_complex *out, const unsigned N)
@@ -274,21 +278,19 @@ void DataProcessor::ifft(fftw_complex *in, fftw_complex *out, const unsigned N)
     }
 }
 
-complex_ptr DataProcessor::inv_dft(const complex_ptr spectrum, const unsigned N)
+void DataProcessor::idft(fftw_complex *in, fftw_complex *out, const unsigned N)
 {
-    complex* inv_dft = new complex[N];
     for(unsigned i = 0; i < N; i++)
         for(unsigned j = 0; j < N; j++){
             double arg = 2*M_PI*j*i/(double)N;
-            inv_dft[i] += spectrum.get()[j]*complex(cos(arg)/N, sin(arg)/N);
+            out[i][REAL] += in[j][REAL]*cos(arg)/N;
+            out[i][IMAG] += in[j][IMAG]*sin(arg)/N;
         }
-    return complex_ptr(inv_dft);
 }
 
 void DataProcessor::hilbert(fftw_complex* in, fftw_complex* out, const unsigned N)
 {
-#define FFT
-#ifdef FFT
+
     auto assign_compl = [](fftw_complex& dest, fftw_complex& val, unsigned coef = 1)->void{
         dest[REAL] = val[REAL]*coef;
         dest[IMAG] = val[IMAG]*coef;
@@ -305,28 +307,23 @@ void DataProcessor::hilbert(fftw_complex* in, fftw_complex* out, const unsigned 
         if(i < half)  assign_compl(in_scaled[i], in[i], 2);
         else if (i > half) assign_compl_d(in_scaled[i], 0);
     }
-//    memset можно не использовать, т.к. при объявлении in_scaled in_scaled[i] == 0
-//    memset(&in_scaled[half+1], 0, (!(half%2) ? half : (half-1))*sizeof(fftw_complex));
     ifft(in_scaled, out, N);
-#else
-    complex_ptr dft_ptr = dft(in, N);
-    for(unsigned i = 1; i < N/2; i++)
-        dft_ptr.get()[i] *= 2;
-    memset(&dft_ptr.get()[N/2+1], 0, N/2-1);
-    return inv_dft(dft_ptr, N);
-#endif
 }
 
-void DataProcessor::calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig, const unsigned start, const unsigned end)
+void DataProcessor::calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig,
+                                      const unsigned start, const unsigned end, fftw_complex* input)
 {
     Cuza& cuza = Cuza::get();
     const unsigned N = end-start+1;
     fftw_complex in[N];
     for(unsigned i = start; i <= end; i++){
-        in[i-start][REAL] = cuza.getSample(i)/2.048;
+        int samp = 0;
+        if(input == nullptr) samp = cuza.getSample(i)/2.048;
+        else samp = input[i-start][REAL];
+        in[i-start][REAL] = samp;
         in[i-start][IMAG] = 0;
     }
-    fft(in, fft_res, end-start+1);
+    fft(in, fft_res, N);
     hilbert(fft_res, complex_sig, N);
 }
 
