@@ -8,13 +8,14 @@ ChartView::ChartView(QWidget *parent): QChartView(parent)
     this->setFocus();
 }
 
-ChartView::ChartView(QChart* chart, ChartType type, QWidget *parent): QChartView(chart, parent), chartType(type)
+ChartView::ChartView(QChart* chart, ChartType type, QWidget *parent):
+    QChartView(chart, parent), m_chart(chart), chartType(type)
 {
-    m_chart = chart;
     this->setRubberBand(QChartView::RectangleRubberBand);
     this->setFocus();
     this->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
     this->setRubberBand(QChartView::RectangleRubberBand);
+    QTimer::singleShot(timer_msec, this, SLOT(updateView()));
 }
 
 void ChartView::setAxisAndRange(QValueAxis *axisX, QValueAxis *axisY)
@@ -167,8 +168,10 @@ QPointF ChartView::nearestNode(float x, float y)
     return m_chart->mapToPosition(point);
 }
 
-void ChartView::checkGrid()
+void ChartView::mainwinResized(const QPointF delta)
 {
+    for (unsigned i = 0; i < labels.size(); i++)
+        labels[i] += delta;
     buildGrid();
 }
 
@@ -200,6 +203,22 @@ void ChartView::receiveEvent(InputEvent type, QInputEvent* event)
         break;
     }
     receiving = false;
+}
+
+void ChartView::receivePointsVecSize(unsigned size, ChartType type)
+{
+    if(type == chartType) m_serVecSize = size;
+}
+
+void ChartView::updateView()
+{
+    if(this->size() != oldSize){
+//        labels.clear();
+        buildGrid();
+        oldSize = this->size();
+    }
+    this->scene()->invalidate(this->sceneRect());
+    QTimer::singleShot(timer_msec, this, SLOT(updateView()));
 }
 
 void ChartView::wheelEvent(QWheelEvent *event)
@@ -299,6 +318,10 @@ void ChartView::mousePressEvent(QMouseEvent *event)
              chartmoving = true;
              if(receiving) mouse_press_event = true;
              this->setCursor(Qt::ClosedHandCursor);
+             if(!receiving && set_label && m_chart->plotArea().contains(m_mousePos)){
+                 if(labels.size() == lab_count) labels.clear();
+                 labels.append(nearestValue(m_chart->mapToValue(m_mousePos)));
+             }
         break;
         case Qt::RightButton:
         // сделать зум по выделенной области
@@ -317,6 +340,7 @@ void ChartView::mouseDoubleClickEvent(QMouseEvent *event)
         resetAxis(m_axisY);
     } else centerVertically(); // центрирование по высоте (shift + double click)
     buildGrid();
+    labels.clear();
     if(!receiving) emit transmitEvent(InputEvent::MDOUBLECLICK, event);
 }
 
@@ -336,9 +360,8 @@ void ChartView::mouseMoveEvent(QMouseEvent *event)
     bool contains = m_chart->plotArea().contains(m_mousePos);
     if(contains) this->setCursor(Qt::OpenHandCursor);
     else this->setCursor(Qt::ArrowCursor);
-    this->scene()->invalidate(this->sceneRect());
-    this->setCursor(Qt::OpenHandCursor);
     if(chartmoving && contains){
+//        labels.clear();
         int curx = event->x(),
             cury = event->y();
         int dX = curx - oldx,
@@ -370,7 +393,8 @@ void ChartView::keyPressEvent(QKeyEvent *event)
 {
     Qt::Key key = Qt::Key(event->key());
     if (key == Qt::Key_Control) anchorX = true;
-    if (key == Qt::Key_Shift) anchorY = true;
+    if (key == Qt::Key_Shift)   anchorY = true;
+    if (key == Qt::Key_Alt)     set_label = true;
     if ((key == Qt::Key_Right || Qt::Key_Left) && !receiving) emit arrowPressed(key);
     if(!receiving) emit transmitEvent(InputEvent::KPRESS, event);
 }
@@ -379,33 +403,75 @@ void ChartView::keyReleaseEvent(QKeyEvent *event)
 {
     int key = event->key();
     if (key == Qt::Key_Control) anchorX = false;
-    if (key == Qt::Key_Shift) anchorY = false;
+    if (key == Qt::Key_Shift)   anchorY = false;
+    if (key == Qt::Key_Alt)     set_label = false;
     if(!receiving) emit transmitEvent(InputEvent::KRELEASE, event);
 }
 
 void ChartView::drawForeground(QPainter *painter, const QRectF &rect)
 {
-    QRectF area = m_chart->plotArea();
     drawAxesLabels(painter);
-    if(area.contains(m_mousePos)){
-        QRectF hint (m_mousePos.x() - hintShift - hintWidth, m_mousePos.y() - hintShift - hintHeight,
-                     hintWidth, hintHeight);
-        QRectF hintBorder (m_mousePos.x() - hintShift - hintWidth - 1, m_mousePos.y() - hintShift - hintHeight-1,
-                           hintWidth+1, hintHeight+1);
-        painter->setPen(QPen(QColor(122, 130, 144), 1));
-        painter->drawLine(m_mousePos.x(), area.top(), m_mousePos.x(), area.bottom());
-        if(!receive_redraw && !mouse_press_event){
-            painter->drawLine(area.left(), m_mousePos.y(), area.right(), m_mousePos.y());
-            painter->drawRect(hintBorder);
+    if(m_chart->plotArea().contains(m_mousePos)) drawHint(painter, m_mousePos);
+    if (labels.size() != 0)
+        for(uchar i = 0; i < labels.size(); i++) drawHint(painter, m_chart->mapToPosition(labels[i]), true);
+}
+
+void ChartView::drawHint(QPainter *painter, QPointF pos, bool label)
+{
+    QRectF area = m_chart->plotArea();
+    QPointF value = nearestValue(m_chart->mapToValue(pos));
+    pos = m_chart->mapToPosition(value, m_chart->series()[0]);
+    painter->setPen(QPen(QColor(122, 130, 144), hintBorderWidth));
+    if(!label)
+        painter->drawLine(pos.x(), area.top(), pos.x(), area.bottom());
+    if(!receive_redraw && !mouse_press_event
+        && area.contains(this->mapFromGlobal(QCursor::pos())) || label){
+        painter->drawLine(area.left(), pos.y(), area.right(), pos.y());
+        QRectF hint;
+        calcHint(pos, hint, area);
+        if(area.contains(hint)){
+            if(label)
+                painter->drawLine(pos.x(), area.top(), pos.x(), area.bottom());
+            painter->setPen(QPen(QColor(122, 130, 144), hintBorderWidth));
             painter->fillRect(hint, QBrush(Qt::white));
-            QPointF value = m_chart->mapToValue(m_mousePos);
+            painter->drawRect(hint);
             painter->setPen(QPen(Qt::black, 10));
-            // текст рисуется вверх от заданно точки расположения
-            painter->drawText(hint.topLeft() + QPointF(3, 12), "x: " + QString().sprintf("%4.4f",value.x()));
-            painter->drawText(hint.topLeft() + QPointF(3, 25), "y: " + QString().sprintf("%4.4f",value.y()));
+            // текст рисуется вверх от заданной точки расположения
+            painter->drawText(hint.topLeft() + QPointF(3.0, 12), "x: " + QString().sprintf("%4.4f",value.x()));
+            painter->drawText(hint.topLeft() + QPointF(3.0, 25), "y: " + QString().sprintf("%4.4f",value.y()));
         }
-        receive_redraw = false;
     }
+    if(labels.size() == lab_count){
+        QRectF dHint;
+        calcHint(m_chart->mapToPosition(labels[lab_count-1]), dHint, area, 1, 2);
+        if(area.contains(dHint)){
+            painter->fillRect(dHint, QBrush(Qt::white));
+            painter->setPen(QPen(QColor(122, 130, 144), hintBorderWidth));
+            painter->drawRect(dHint);
+            painter->setPen(QPen(Qt::black, 10));
+            QPointF value = labels[lab_count-1] - labels[lab_count-2];
+            painter->drawText(dHint.topLeft() + QPointF(3.0, 12), "dx: " + QString().sprintf("%4.4f", fabs(value.rx())));
+            painter->drawText(dHint.topLeft() + QPointF(3.0, 25), "dy: " + QString().sprintf("%4.4f", fabs(value.ry())));
+        }
+    }
+    receive_redraw = false;
+}
+
+QPointF ChartView::nearestValue(const QPointF &mappedValue)
+{
+    // считается, что график имеет линейную ось x
+    #define SER_VEC(i) ((QLineSeries*)(m_chart->series()[0]))->pointsVector()[i];
+    unsigned cur_size =((QLineSeries*)(m_chart->series()[0]))->pointsVector().size();
+    bool doubled = false;
+    // не смотря на то, что серия была заполнена конкретным числом точек,
+    // размер вектора все равно почему-то варьируется
+    if(cur_size == m_serVecSize*2 - 1) doubled = true;
+    QPointF begin = SER_VEC(0);
+    QPointF next = SER_VEC(1);
+    int delta = (mappedValue.x() - begin.x())/(next.x()-begin.x()),
+        index = !doubled ? delta : ((delta > 0) ? delta*2-1 : 0);
+    if(index >= cur_size) return SER_VEC(cur_size-1);
+    return SER_VEC(index);
 }
 
 void ChartView::drawAxesLabels(QPainter *painter)
@@ -418,4 +484,21 @@ void ChartView::drawAxesLabels(QPainter *painter)
     QRect wid_area = this->rect();
     painter->drawText(QPointF(wid_area.left()+30, wid_area.top()+52), axesLabels[chartType*2]);
     painter->drawText(QPointF(wid_area.right()/2, wid_area.bottom()-20), axesLabels[chartType*2+1]);
+}
+
+void ChartView::calcHint(const QPointF &pos, QRectF &hint, const QRectF &area,
+                         const unsigned coefX, const unsigned coefY)
+{
+    if(pos.x() - coefX*hintShift - coefX*hintWidth > area.left())
+        hint.setLeft(pos.x() - coefX*hintShift - coefX*hintWidth);
+    else hint.setLeft(pos.x() + coefX*hintShift);
+    if(pos.y() - coefY*hintShift - coefY*hintHeight > area.top())
+        hint.setTop(pos.y() - coefY*hintShift - coefY*hintHeight);
+    else { // coefY-1 - потому что необдимо отступить вниз на 1 высоту меньше
+        if(pos.y() - (coefY-1)*hintShift - (coefY-1)*hintHeight > area.top() && coefY > 1)
+            hint.setTop(pos.y() + (coefY-1)*hintShift + (coefY-2)*hintHeight);
+        else hint.setTop(pos.y() + coefY*hintShift + (coefY-1)*hintHeight);
+    }
+    hint.setWidth(hintWidth);
+    hint.setHeight(hintHeight);
 }

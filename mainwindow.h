@@ -62,7 +62,7 @@ public slots:
     void appReady();
     void redrawOsc(Qt::Key);
 signals:
-    void rebuildGrid();
+    void resized(const QPointF delta);
 };
 
 class FileSystemModel: public QFileSystemModel{

@@ -25,6 +25,7 @@
 #define ENV_COEF 1000
 #define REAL 0
 #define IMAG 1
+#define ADC_COEF 2.048
 using namespace QtCharts;
 
 typedef std::complex<double> complex;
@@ -72,12 +73,13 @@ private:
     void idft(fftw_complex *in, fftw_complex *out, const unsigned N);
     void fft(fftw_complex *in, fftw_complex *out, const unsigned N);
     void ifft(fftw_complex *in, fftw_complex *out, const unsigned N);
-    complex_ptr fft_inside(const std::vector<complex*>& in, const unsigned N);
     // преобразование гильберта для извлечения огибающей
     void hilbert(fftw_complex* in,  fftw_complex* out, const unsigned N);
     // расчет бпф и комплексного сигнала
     void calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig,
                            const unsigned start, const unsigned end, fftw_complex* input = nullptr);
+signals:
+    void setPointsVecSize(unsigned size, ChartType type);
 public slots:
     void setScale (const double& value);
 };

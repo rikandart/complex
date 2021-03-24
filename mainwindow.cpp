@@ -73,7 +73,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
         QSize delta = ui->tabWidget->size() - oldSize;
         oldSize = ui->tabWidget->size();
         m_splitter[0]->resize(m_splitter[0]->size()+delta);
-        emit rebuildGrid();
+        emit resized(QPointF(delta.width(), delta.height()));
         //m_graphView->resize(m_graphView->size()+delta);
         //if(!m_graphScene->items().isEmpty()) m_dataPr->dispOutput();
     }
@@ -96,8 +96,10 @@ void MainWindow::graphTabInit()
         }
         QObject::connect(m_chViews[i], &ChartView::arrowPressed,
                          this, &MainWindow::redrawOsc);
-        QObject::connect(this, &MainWindow::rebuildGrid,
-                         m_chViews[i], &ChartView::checkGrid);
+        QObject::connect(this, &MainWindow::resized,
+                         m_chViews[i], &ChartView::mainwinResized);
+        QObject::connect(m_dataPr, &DataProcessor::setPointsVecSize,
+                         m_chViews[i], &ChartView::receivePointsVecSize);
     }
     QObject::connect(m_chViews[ChartType::chOSC], &ChartView::transmitEvent,
                      m_chViews[ChartType::chPHASE], &ChartView::receiveEvent);
