@@ -73,7 +73,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
         QSize delta = ui->tabWidget->size() - oldSize;
         oldSize = ui->tabWidget->size();
         m_splitter[0]->resize(m_splitter[0]->size()+delta);
-        emit resized(QPointF(delta.width(), delta.height()));
+        emit resized();
         //m_graphView->resize(m_graphView->size()+delta);
         //if(!m_graphScene->items().isEmpty()) m_dataPr->dispOutput();
     }
@@ -87,7 +87,7 @@ void MainWindow::graphTabInit()
     for(unsigned i = 1; i < splitters_count; i++)
         m_splitter[0]->addWidget(m_splitter[i]);
     for(unsigned i = 0; i < Cuza::get().getChartCount(); i++){
-        if(i == ChartType::chOSC || i == ChartType::chPHASE /*|| Chart::chFREQ*/){
+        if(i == ChartType::chOSC || i == ChartType::chPHASE || i == ChartType::chFREQ){
             m_chViews[i] = new ChartView((m_charts[i] = new QChart), ChartType(i));
             m_splitter[1]->addWidget(m_chViews[i]);
         } else {
@@ -101,19 +101,31 @@ void MainWindow::graphTabInit()
         QObject::connect(m_dataPr, &DataProcessor::setPointsVecSize,
                          m_chViews[i], &ChartView::receivePointsVecSize);
     }
-    QObject::connect(m_chViews[ChartType::chOSC], &ChartView::transmitEvent,
-                     m_chViews[ChartType::chPHASE], &ChartView::receiveEvent);
+    // соединение сигналов и слотов для chOsc, chPhase и chFreq
+    const quint8 connChartCount = 3;
+    for(int i = 0, j = 0; i < connChartCount && j < connChartCount; j++){
+        if(i == j) continue;
+        qDebug() << "i" << i << "j" << j;
+        QObject::connect(m_chViews[ChartType(i)], &ChartView::transmitEvent,
+                         m_chViews[ChartType(j)], &ChartView::receiveEvent);
+        if(j == connChartCount-1 && i != connChartCount-1){
+            i++;
+            j = -1;
+        }
+    }
 
+/*
     QObject::connect(m_chViews[ChartType::chPHASE], &ChartView::transmitEvent,
                      m_chViews[ChartType::chOSC], &ChartView::receiveEvent);
-//    QObject::connect(m_chViews[Chart::chOSC], &ChartView::transmitEvent,
-//                     m_chViews[Chart::chFREQ], &ChartView::receiveEvent);
-//    QObject::connect(m_chViews[Chart::chPHASE], &ChartView::transmitEvent,
-//                     m_chViews[Chart::chFREQ], &ChartView::receiveEvent);
-//    QObject::connect(m_chViews[Chart::chFREQ], &ChartView::transmitEvent,
-//                     m_chViews[Chart::chPHASE], &ChartView::receiveEvent);
-//    QObject::connect(m_chViews[Chart::chFREQ], &ChartView::transmitEvent,
-//                     m_chViews[Chart::chOSC], &ChartView::receiveEvent);
+    QObject::connect(m_chViews[ChartType::chOSC], &ChartView::transmitEvent,
+                     m_chViews[ChartType::chFREQ], &ChartView::receiveEvent);
+    QObject::connect(m_chViews[ChartType::chPHASE], &ChartView::transmitEvent,
+                     m_chViews[ChartType::chFREQ], &ChartView::receiveEvent);
+    QObject::connect(m_chViews[ChartType::chFREQ], &ChartView::transmitEvent,
+                     m_chViews[ChartType::chPHASE], &ChartView::receiveEvent);
+    QObject::connect(m_chViews[ChartType::chFREQ], &ChartView::transmitEvent,
+                     m_chViews[ChartType::chOSC], &ChartView::receiveEvent);
+                     */
     // graphview
     // is used for db
     /*m_graphView = new GraphView(ui->tab_3);

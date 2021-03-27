@@ -78,6 +78,17 @@ private:
     // расчет бпф и комплексного сигнала
     void calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig,
                            const unsigned start, const unsigned end, fftw_complex* input = nullptr);
+    // метод рунге-кутты 4го порядка
+    // y[n+1] = y[n] + h/6(k1 + 2*k2 + 2*k3 + k4)
+    void calc_freq(fftw_complex* complex_sig, const double step,
+                   const unsigned size, fftw_complex *out);
+    // модуль и аргумент комплексного числа
+    inline double abs_complex(const fftw_complex& fft_samp){
+        return sqrt(pow(fft_samp[REAL], 2) + pow(fft_samp[IMAG], 2));
+    };
+    virtual double arg(const fftw_complex& fft_samp){
+        return atan(fft_samp[IMAG]/fft_samp[REAL])*180/M_PI;
+    };
 signals:
     void setPointsVecSize(unsigned size, ChartType type);
 public slots:

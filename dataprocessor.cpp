@@ -201,35 +201,29 @@ void DataProcessor::oscOutput(QLineSeries** &series, QChart** charts, bool prev)
                 emit setPointsVecSize(size/2+1, ChartType(i));
         }
         calc_fft_comp_sig(fft_res, complex_sig, start_samp, end_samp, in_samps);
-        auto abs = [](const fftw_complex& fft_samp)->double{
-                return sqrt(pow(fft_samp[REAL], 2) + pow(fft_samp[IMAG], 2));
-        };
-        auto arg = [](const fftw_complex& fft_samp)->double{
-            return atan(fft_samp[IMAG]/fft_samp[REAL])*180/M_PI;
-        };
         static unsigned cou = 0;
         for(unsigned i = 0; i < size; i++){
             if(i != 0){
                 m_lineseries[Series::SAMPS]->append(i*(1.0/sampling_rate), in_samps[i-1][REAL]);
-                m_lineseries[Series::ENV]->append(i*(1.0/sampling_rate), abs(complex_sig[i-1]));
+                m_lineseries[Series::ENV]->append(i*(1.0/sampling_rate), abs_complex(complex_sig[i-1]));
             }
             m_lineseries[Series::SAMPS]->append(i*(1.0/sampling_rate), in_samps[i][REAL]);
-            m_lineseries[Series::ENV]->append(i*(1.0/sampling_rate), abs(complex_sig[i]));
+            m_lineseries[Series::ENV]->append(i*(1.0/sampling_rate), abs_complex(complex_sig[i]));
             m_lineseries[Series::PHASE]->append(i*(1.0/sampling_rate),arg(complex_sig[i]));
-//            if(i != start_samp)
-//                m_lineseries[Series::FREQ]->append(i/**(1.0/sampling_rate)*/,
-//                                                   (arg(complex_sig[i])-arg(complex_sig[i-1]))*sampling_rate);
+            if(i > 1)
+                m_lineseries[Series::FREQ]->append(i*(1.0/sampling_rate),
+                                                   (arg(complex_sig[i])-arg(complex_sig[i-2]))/(2*1.0/sampling_rate));
             if(i <= size/2){
                 if(i != 0)
-                    m_lineseries[Series::AMP]->append(tuned_freq - sampling_rate/2.0 + i*sampling_rate/(double)size, abs(fft_res[i-1]));
-                m_lineseries[Series::AMP]->append(tuned_freq - sampling_rate/2.0 + i*sampling_rate/(double)size, abs(fft_res[i]));
+                    m_lineseries[Series::AMP]->append(tuned_freq - sampling_rate/2.0 + i*sampling_rate/(double)size, abs_complex(fft_res[i-1]));
+                m_lineseries[Series::AMP]->append(tuned_freq - sampling_rate/2.0 + i*sampling_rate/(double)size, abs_complex(fft_res[i]));
                 cou++;
             }
         }
         qDebug() << "start_samp" << start_samp << "end_samp" << end_samp;
         qDebug() << "-----------------------------------------------";
     }
-    QString series_name[] = {"Сигнал", "Фаза", /*"Мгновенная частота",*/ "Амплитудный спектр", "Огибающая"};
+    QString series_name[] = {"Сигнал", "Фаза", "Мгновенная частота", "Амплитудный спектр", "Огибающая"};
     for(unsigned short i = 0; i < cuza.getChartCount(); i++){
         m_charts[i]->addSeries(m_lineseries[i]);
         m_charts[i]->createDefaultAxes();
@@ -346,6 +340,16 @@ void DataProcessor::calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* compl
     }
     fft(in, fft_res, N);
     hilbert(fft_res, complex_sig, N);
+}
+
+void DataProcessor::calc_freq(fftw_complex *complex_sig, const double step,
+                              const unsigned size, fftw_complex *out)
+{
+//    for(unsigned i = 0; i < size; i+=step){
+//        double k1 = arg(complex_sig[i]),
+//               k2 = arg(complex_sig[i+(int)step/2]),
+//               k3 = arg(complex_sig[i+(int)step/2]),
+//    }
 }
 
 void DataProcessor::setScale(const double& value)

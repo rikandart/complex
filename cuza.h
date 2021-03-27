@@ -32,7 +32,7 @@ enum SpectrumWindows {
 enum Series {
   SAMPS, // отсчеты
   PHASE, // фаза
-//  FREQ,  // мгновенная частота
+  FREQ,  // мгновенная частота
   AMP,   // амплитудный спектр
   ENV,   // огибающая
 };
@@ -40,7 +40,7 @@ enum Series {
 enum ChartType {
   chOSC,  // отсчеты и огибающая
   chPHASE,// фазовый спектр
-//  chFREQ, // мгновенная частота
+  chFREQ, // мгновенная частота
   chAMP,  // амплитудный спектр
 };
 
@@ -291,8 +291,8 @@ private:
     // буфер отсчетов
     qint16*      sampbuffer;
     // кол-во серий выводимы в диаграмму (chart)
-    const unsigned short m_series_count = 4,
-                         m_chart_count = 3;
+    const unsigned short m_series_count = 5,
+                         m_chart_count = 4;
 
 signals:
 
