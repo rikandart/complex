@@ -83,7 +83,7 @@ private:
     // тип графика
     ChartType chartType;
     // кол-во меток на графике, время обновления вида виджета
-    static const uchar lab_count = 2, timer_msec = 50;
+    static const uchar lab_count = 2, timer_msec = 50, indexes_count = 2;
     // массив с расположениями метокна графике
     QList<QPointF> labels;
     int     oldx = 0, oldy = 0;
@@ -113,18 +113,25 @@ private:
     bool    receiving = false;
     // флаг нажатия кнопки мыши
     bool    mouse_pressed = false;
+    // флаг выделения конкретного места на осциллограмме
+    bool    take_samples = false;
+    QList<double> indexes;
+    // коэффициенты деления значений графиков фазы и частоты
+    unsigned phasecoef = 1, freqcoef = 1;
 signals:
     void arrowPressed(Qt::Key);
     // передача какого либо события другому такому же виджету
-    void transmitEvent(InputEvent type, QInputEvent* event);
+    void transmitEvent(InputEvent type, QInputEvent* event, const QValueAxis *axisX);
 public slots:
     // размеры окна изменены
     void mainwinResized();
     // прием события от другого виджета
-    void receiveEvent(InputEvent type, QInputEvent* event);
+    void receiveEvent(InputEvent type, QInputEvent* event, const QValueAxis *axisX);
     // размер вектора точек с данными
     void receivePointsVecSize(unsigned size, ChartType type);
     // перерисовка внешнего вида виджета
     void updateView();
+    // прием коэффициента масштаба
+    void receiveCoef(const unsigned coef, ChartType type);
 };
 #endif // CHARTVIEW_H

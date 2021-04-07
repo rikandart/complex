@@ -169,10 +169,13 @@ void ChartView::mainwinResized()
     buildGrid();
 }
 
-void ChartView::receiveEvent(InputEvent type, QInputEvent* event)
+void ChartView::receiveEvent(InputEvent type, QInputEvent* event, const QValueAxis *axisX)
 {
     Q_ASSERT(event != nullptr);
     receiving = true;
+    m_axisX->setMax(axisX->max());
+    m_axisX->setMin(axisX->min());
+    getZoomedAxes();
     switch (type) {
     case InputEvent::MWHEEL:
         this->wheelEvent(static_cast<QWheelEvent*>(event));
@@ -210,14 +213,27 @@ void ChartView::updateView()
         buildGrid();
         oldSize = this->size();
     }
+    if(!take_samples) indexes.clear();
     this->scene()->invalidate(this->sceneRect());
     QTimer::singleShot(timer_msec, this, SLOT(updateView()));
+}
+
+void ChartView::receiveCoef(const unsigned coef, ChartType type)
+{
+    switch (type) {
+    case ChartType::chPHASE:
+        phasecoef = coef;
+        break;
+    case ChartType::chFREQ:
+        freqcoef = coef;
+        break;
+    }
 }
 
 void ChartView::wheelEvent(QWheelEvent *event)
 {
     zoomChart(QPointF(event->x(), event->y()), event->angleDelta().y());
-    if(!receiving) emit transmitEvent(InputEvent::MWHEEL, event);
+    if(!receiving) emit transmitEvent(InputEvent::MWHEEL, event, m_axisX);
 }
 
 void ChartView::zoomChart(QPointF pos, int ang_data, QRectF zoomArea)
@@ -336,6 +352,8 @@ void ChartView::mousePressEvent(QMouseEvent *event)
                      labels.append(nearestValue(m_chart->mapToValue(m_mousePos)));
                  }
             }
+//            if(take_samples)
+//                nearestValue(m_chart->mapToValue(m_mousePos));
         break;
         case Qt::RightButton:
             // сделать зум по выделенной области
@@ -343,11 +361,15 @@ void ChartView::mousePressEvent(QMouseEvent *event)
             if(receiving) mouse_pressed = true;
         break;
     }
-    if(!receiving) emit transmitEvent(InputEvent::MPRESS, event);
+    if(!receiving) emit transmitEvent(InputEvent::MPRESS, event, m_axisX);
 }
 
 void ChartView::mouseDoubleClickEvent(QMouseEvent *event)
 {
+    if(set_label && this->hasFocus()){
+        labels.clear();
+        return;
+    }
     if(!anchorY) {// даблклик центрирует график и сбрасывает зум
         zoomcountX = 0;
         zoomcountY = 0;
@@ -356,8 +378,7 @@ void ChartView::mouseDoubleClickEvent(QMouseEvent *event)
         resetAxis(m_axisY);
     } else centerVertically(); // центрирование по высоте (shift + double click)
     buildGrid();
-    if(set_label && this->hasFocus()) labels.clear();
-    if(!receiving) emit transmitEvent(InputEvent::MDOUBLECLICK, event);
+    if(!receiving) emit transmitEvent(InputEvent::MDOUBLECLICK, event, m_axisX);
 }
 
 void ChartView::mouseReleaseEvent(QMouseEvent *event)
@@ -377,7 +398,7 @@ void ChartView::mouseReleaseEvent(QMouseEvent *event)
         m_zoomRect = QRectF();
     }
     // иначе будет продолжаться бесконечно
-    if(!receiving) emit transmitEvent(InputEvent::MRELEASE, event);
+    if(!receiving) emit transmitEvent(InputEvent::MRELEASE, event, m_axisX);
 }
 
 void ChartView::mouseMoveEvent(QMouseEvent *event)
@@ -413,7 +434,7 @@ void ChartView::mouseMoveEvent(QMouseEvent *event)
         oldy = cury;
         buildGrid();
     }
-    if(!receiving) emit transmitEvent(InputEvent::MMOVE, event);
+    if(!receiving) emit transmitEvent(InputEvent::MMOVE, event, m_axisX);
 }
 
 void ChartView::keyPressEvent(QKeyEvent *event)
@@ -426,16 +447,20 @@ void ChartView::keyPressEvent(QKeyEvent *event)
         labels.clear();
         emit arrowPressed(key);
     }
-    if(!receiving) emit transmitEvent(InputEvent::KPRESS, event);
+    if(anchorX && set_label && !take_samples){
+        anchorX = set_label = false;
+        if(!receiving) take_samples = true;
+    }
+    if(!receiving) emit transmitEvent(InputEvent::KPRESS, event, m_axisX);
 }
 
 void ChartView::keyReleaseEvent(QKeyEvent *event)
 {
     int key = event->key();
-    if (key == Qt::Key_Control) anchorX = false;
+    if (key == Qt::Key_Control) anchorX = take_samples = false;
     if (key == Qt::Key_Shift)   anchorY = false;
-    if (key == Qt::Key_Alt)     set_label = false;
-    if(!receiving) emit transmitEvent(InputEvent::KRELEASE, event);
+    if (key == Qt::Key_Alt)     set_label = take_samples = false;
+    if(!receiving) emit transmitEvent(InputEvent::KRELEASE, event, m_axisX);
 }
 
 void ChartView::drawForeground(QPainter *painter, const QRectF &rect)
@@ -444,9 +469,10 @@ void ChartView::drawForeground(QPainter *painter, const QRectF &rect)
     if(m_chart->plotArea().contains(m_mousePos)) drawHint(painter, m_mousePos);
     if (labels.size() != 0)
         for(uchar i = 0; i < labels.size(); i++) drawHint(painter, labels[i], true);
-    if(m_prevMousePos != QPointF(-1, -1) && m_chart->plotArea().contains(m_prevMousePos)){
+    if(m_prevMousePos != QPointF(-1, -1) && m_chart->plotArea().contains(m_prevMousePos))
         drawZoomRect(m_prevMousePos, painter);
-    }
+//    if(take_samples)
+
 }
 
 void ChartView::drawHint(QPainter *painter, QPointF pos, bool label)
@@ -511,8 +537,8 @@ void ChartView::drawAxesLabels(QPainter *painter)
 {
     QList<QString> axesLabels;
     axesLabels  << "ПЧ, мВ"   << "t, мкс"
-                << "Ф, °"     << "t, мкс"
-                << "F, МГц"   << "t, мкс"
+                << QString().sprintf((phasecoef == 1) ? "Ф, °" : "Ф/%u, °", phasecoef) << "t, мкс"
+                << QString().sprintf((freqcoef == 1) ? "F, МГц" : "F/%u, МГц", freqcoef) << "t, мкс"
                 << "A, мВ∙мкс" << "f, МГц";
     QRect wid_area = this->rect();
     painter->drawText(QPointF(wid_area.left()+30, wid_area.top()+52), axesLabels[chartType*2]);

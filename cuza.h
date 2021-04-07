@@ -8,7 +8,6 @@
 #include <QDebug>
 #include <cmath>
 #include <math.h>
-#define THRESHOLD 100
 
 // типы
 // Тип выводимого на график спектра.

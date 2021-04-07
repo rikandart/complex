@@ -26,11 +26,14 @@
 #define REAL 0
 #define IMAG 1
 #define ADC_COEF 2.048
+//#define MAX_SAMP
+#define SPECTRUM_MAX_SEARCH
+#ifndef SPECTRUM_MAX_SEARCH
+#define THRESHOLD 100
+#else
+#define THRESHOLD 650
+#endif
 using namespace QtCharts;
-
-typedef std::complex<double> complex;
-typedef std::shared_ptr<complex> complex_ptr;
-typedef std::shared_ptr<qint16> qint16_ptr;
 
 namespace Ui {
 class FileExplorer;
@@ -57,9 +60,7 @@ public:
     void resizeCheck(const unsigned len, const unsigned width);
     unsigned rightcount = 0;
 private:
-    /*  win_offset - с какого окна начинать вывод отсчетов
-     *  win_i - индекс этого окна   */
-    unsigned win_i = 0, offset = 0;
+    int offset = 0, end_offset = 0;
     double scale = 1;
     QLineSeries** m_lineseries = nullptr;
     QChart** m_charts = nullptr;
@@ -78,10 +79,11 @@ private:
     // расчет бпф и комплексного сигнала
     void calc_fft_comp_sig(fftw_complex* fft_res, fftw_complex* complex_sig,
                            const unsigned start, const unsigned end, fftw_complex* input = nullptr);
-    // метод рунге-кутты 4го порядка
-    // y[n+1] = y[n] + h/6(k1 + 2*k2 + 2*k3 + k4)
-    void calc_freq(fftw_complex* complex_sig, const double step,
-                   const unsigned size, fftw_complex *out);
+    // вычисление мгновенной частоты
+    // f[i] = 1/Td * (pi - acos(((signal[i-2]+signal[i])/signal[i-1])/2))/2pi
+    void calc_instfreq(const double* phase, double *out, const unsigned size);
+    // правильное вычисление фазы
+    void calc_phase(fftw_complex* complex_sig, double *out, const unsigned size);
     // модуль и аргумент комплексного числа
     inline double abs_complex(const fftw_complex& fft_samp){
         return sqrt(pow(fft_samp[REAL], 2) + pow(fft_samp[IMAG], 2));
@@ -91,6 +93,7 @@ private:
     };
 signals:
     void setPointsVecSize(unsigned size, ChartType type);
+    void setCoef(const unsigned coef, ChartType type);
 public slots:
     void setScale (const double& value);
 };

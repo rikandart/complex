@@ -100,12 +100,14 @@ void MainWindow::graphTabInit()
                          m_chViews[i], &ChartView::mainwinResized);
         QObject::connect(m_dataPr, &DataProcessor::setPointsVecSize,
                          m_chViews[i], &ChartView::receivePointsVecSize);
+        if(i == ChartType::chPHASE || i == ChartType::chFREQ)
+            QObject::connect(m_dataPr, &DataProcessor::setCoef,
+                             m_chViews[i], &ChartView::receiveCoef);
     }
     // соединение сигналов и слотов для chOsc, chPhase и chFreq
     const quint8 connChartCount = 3;
     for(int i = 0, j = 0; i < connChartCount && j < connChartCount; j++){
         if(i == j) continue;
-        qDebug() << "i" << i << "j" << j;
         QObject::connect(m_chViews[ChartType(i)], &ChartView::transmitEvent,
                          m_chViews[ChartType(j)], &ChartView::receiveEvent);
         if(j == connChartCount-1 && i != connChartCount-1){
@@ -113,19 +115,6 @@ void MainWindow::graphTabInit()
             j = -1;
         }
     }
-
-/*
-    QObject::connect(m_chViews[ChartType::chPHASE], &ChartView::transmitEvent,
-                     m_chViews[ChartType::chOSC], &ChartView::receiveEvent);
-    QObject::connect(m_chViews[ChartType::chOSC], &ChartView::transmitEvent,
-                     m_chViews[ChartType::chFREQ], &ChartView::receiveEvent);
-    QObject::connect(m_chViews[ChartType::chPHASE], &ChartView::transmitEvent,
-                     m_chViews[ChartType::chFREQ], &ChartView::receiveEvent);
-    QObject::connect(m_chViews[ChartType::chFREQ], &ChartView::transmitEvent,
-                     m_chViews[ChartType::chPHASE], &ChartView::receiveEvent);
-    QObject::connect(m_chViews[ChartType::chFREQ], &ChartView::transmitEvent,
-                     m_chViews[ChartType::chOSC], &ChartView::receiveEvent);
-                     */
     // graphview
     // is used for db
     /*m_graphView = new GraphView(ui->tab_3);
@@ -178,9 +167,15 @@ void MainWindow::on_fileTree_doubleClicked(const QModelIndex &index){
             m_dataPr->Read(m_qfsm->filePath(index));
             m_dataPr->oscOutput(m_series, m_charts);
             ui->tabWidget->setCurrentWidget(ui->tab_2);
+#ifndef MAX_SAMP
+
             for(unsigned i = 0; i < Cuza::get().getChartCount(); i++)
                 m_chViews[i]->setAxisAndRange(static_cast<QValueAxis*>(m_charts[i]->axisX()),
                                          static_cast<QValueAxis*>(m_charts[i]->axisY()));
+#else
+            m_chViews[ChartType::chOSC]->setAxisAndRange(static_cast<QValueAxis*>(m_charts[ChartType::chOSC]->axes()[0]),
+                                     static_cast<QValueAxis*>(m_charts[ChartType::chOSC]->axes()[1]));
+#endif
             m_chViews[ChartType::chOSC]->setFocus();
         }
     }
